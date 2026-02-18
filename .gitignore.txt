@@ -8,14 +8,14 @@ __pycache__/
 *.pyo
 *.pyd
 
-# Build / executável
+# Build
 build/
 dist/
 *.spec
 
-# Arquivos do sistema
+# Banco local
+*.db
+
+# Sistema
 .DS_Store
 Thumbs.db
-
-# Banco local opcional (se não quiser versionar)
-# database/lotofacil.db
