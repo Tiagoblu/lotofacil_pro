@@ -99,7 +99,16 @@ def iniciar_interface():
         bg="white",
         fg="#2c3e50",
         font=("Segoe UI", 14, "bold")
-    ).pack(pady=15)
+    ).pack(pady=10)
+
+    contador_label = tk.Label(
+        area,
+        text="Nenhum jogo gerado.",
+        bg="white",
+        fg="#555",
+        font=("Segoe UI", 10, "italic")
+    )
+    contador_label.pack(pady=(0, 5))
 
     text_frame = tk.Frame(area)
     text_frame.pack(fill="both", expand=True, padx=20)
@@ -153,16 +162,26 @@ def iniciar_interface():
 
             btn_gerar.config(state="disabled")
             label_status.config(text="Gerando jogos...")
-
             resultado_box.delete("1.0", tk.END)
             root.update_idletasks()
 
             resultado = gerar_simulacao(nivel=nivel, quantidade=quantidade)
 
-            resultado_box.insert(tk.END, "\n".join(resultado))
+            texto_formatado = ""
+
+            for i, jogo in enumerate(resultado, start=1):
+                texto_formatado += f"JOGO {i:03d}\n"
+                texto_formatado += "-" * 30 + "\n"
+                texto_formatado += f"{jogo}\n\n"
+
+            resultado_box.insert(tk.END, texto_formatado)
             resultado_box.see("1.0")
 
-            label_status.config(text=f"{quantidade} jogo(s) gerado(s) com sucesso.")
+            contador_label.config(
+                text=f"{quantidade} jogo(s) gerado(s)"
+            )
+
+            label_status.config(text="Geração concluída.")
             btn_gerar.config(state="normal")
 
         except ValueError:
