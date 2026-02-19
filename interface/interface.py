@@ -1,7 +1,6 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
 import threading
-import time
 
 from core.baixar import baixar_dados_novos
 from core.simulacao import gerar_simulacao
@@ -14,16 +13,9 @@ def iniciar_interface():
     root.geometry("1000x650")
     root.configure(bg="#eef1f5")
 
-    # ==============================
-    # ESTILO
-    # ==============================
-
     style = ttk.Style()
     style.theme_use("clam")
-
-    style.configure("TProgressbar",
-                    thickness=8,
-                    background="#4a90e2")
+    style.configure("TProgressbar", thickness=8, background="#4a90e2")
 
     # ==============================
     # HEADER
@@ -32,17 +24,16 @@ def iniciar_interface():
     header = tk.Frame(root, bg="#2c3e50", height=70)
     header.pack(fill="x")
 
-    titulo = tk.Label(
+    tk.Label(
         header,
         text="LOTOFÁCIL PRO",
         bg="#2c3e50",
         fg="white",
         font=("Segoe UI", 18, "bold")
-    )
-    titulo.pack(pady=15)
+    ).pack(pady=15)
 
     # ==============================
-    # CONTAINER PRINCIPAL
+    # CONTAINER
     # ==============================
 
     container = tk.Frame(root, bg="#eef1f5")
@@ -64,8 +55,6 @@ def iniciar_interface():
         font=("Segoe UI", 14, "bold")
     ).pack(pady=15)
 
-    # ---- NÍVEL ----
-
     nivel_var = tk.StringVar(value="A")
 
     niveis = [
@@ -85,8 +74,6 @@ def iniciar_interface():
             font=("Segoe UI", 10),
             anchor="w"
         ).pack(fill="x", padx=20)
-
-    # ---- QUANTIDADE ----
 
     tk.Label(
         painel,
@@ -114,16 +101,24 @@ def iniciar_interface():
         font=("Segoe UI", 14, "bold")
     ).pack(pady=15)
 
+    text_frame = tk.Frame(area)
+    text_frame.pack(fill="both", expand=True, padx=20)
+
+    scrollbar = tk.Scrollbar(text_frame)
+    scrollbar.pack(side="right", fill="y")
+
     resultado_box = tk.Text(
-        area,
-        height=15,
+        text_frame,
         font=("Consolas", 12),
         bg="#f8f9fb",
         bd=0,
         padx=15,
-        pady=15
+        pady=15,
+        yscrollcommand=scrollbar.set
     )
-    resultado_box.pack(fill="both", expand=True, padx=20)
+    resultado_box.pack(fill="both", expand=True)
+
+    scrollbar.config(command=resultado_box.yview)
 
     # ==============================
     # STATUS BAR
@@ -156,17 +151,28 @@ def iniciar_interface():
             if quantidade <= 0:
                 raise ValueError
 
-            # 🔹 Limpa imediatamente antes de gerar (UX melhorada)
+            btn_gerar.config(state="disabled")
+            label_status.config(text="Gerando jogos...")
+
             resultado_box.delete("1.0", tk.END)
+            root.update_idletasks()
 
             resultado = gerar_simulacao(nivel=nivel, quantidade=quantidade)
 
             resultado_box.insert(tk.END, "\n".join(resultado))
+            resultado_box.see("1.0")
+
+            label_status.config(text=f"{quantidade} jogo(s) gerado(s) com sucesso.")
+            btn_gerar.config(state="normal")
 
         except ValueError:
             messagebox.showerror("Erro", "Quantidade deve ser número positivo.")
+            btn_gerar.config(state="normal")
+            label_status.config(text="Erro.")
         except Exception as e:
             messagebox.showerror("Erro", str(e))
+            btn_gerar.config(state="normal")
+            label_status.config(text="Erro.")
 
     def atualizar_barra(percentual, numero_atual):
         progress["value"] = percentual
