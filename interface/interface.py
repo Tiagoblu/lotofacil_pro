@@ -125,6 +125,9 @@ def iniciar_interface():
     )
     resultado_box.pack(fill="both", expand=True, padx=20)
 
+    # 🔒 Inicialmente somente leitura
+    resultado_box.config(state="disabled")
+
     # ==============================
     # STATUS BAR
     # ==============================
@@ -158,8 +161,12 @@ def iniciar_interface():
 
             resultado = gerar_simulacao(nivel=nivel, quantidade=quantidade)
 
+            # 🔓 Habilita para escrever
+            resultado_box.config(state="normal")
             resultado_box.delete("1.0", tk.END)
             resultado_box.insert(tk.END, "\n".join(resultado))
+            # 🔒 Volta para somente leitura
+            resultado_box.config(state="disabled")
 
         except ValueError:
             messagebox.showerror("Erro", "Quantidade deve ser número positivo.")

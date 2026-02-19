@@ -1,21 +1,6 @@
-# Ambiente virtual
 venv/
-.env/
-
-# Cache Python
 __pycache__/
 *.pyc
-*.pyo
-*.pyd
-
-# Build
-build/
 dist/
-*.spec
-
-# Banco local
+build/
 *.db
-
-# Sistema
-.DS_Store
-Thumbs.db
