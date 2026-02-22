@@ -1,6 +1,4 @@
 import random
-import time
-
 from core.metricas import (
     carregar_historico,
     frequencia_total,
@@ -10,32 +8,19 @@ from core.metricas import (
 from core.scoring import calcular_score
 
 
-def gerar_simulacao_progressiva(nivel="C", quantidade=10, callback_progresso=None):
+def gerar_jogos_avancados(quantidade=10, simulacoes=3000):
 
     historico = carregar_historico()
-
-    if not historico:
-        return []
-
     freq_total = frequencia_total(historico)
     freq_recente = frequencia_recente(historico)
     atraso = atraso_dezenas(historico)
 
     jogos = []
 
-    total_iteracoes = 3000
-    inicio = time.time()
-
-    for i in range(total_iteracoes):
-
+    for _ in range(simulacoes):
         jogo = sorted(random.sample(range(1, 26), 15))
         score = calcular_score(jogo, freq_total, freq_recente, atraso)
         jogos.append((jogo, score))
-
-        if callback_progresso and i % 50 == 0:
-            tempo_decorrido = time.time() - inicio
-            progresso = (i + 1) / total_iteracoes
-            callback_progresso(progresso, tempo_decorrido)
 
     jogos.sort(key=lambda x: x[1], reverse=True)
 

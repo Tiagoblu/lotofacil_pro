@@ -1,262 +1,210 @@
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import ttk, messagebox, filedialog
 import threading
+import time
+import csv
 
-from core.baixar import baixar_dados_novos
-from core.simulacao import gerar_simulacao
+from core.simulacao import gerar_simulacao_progressiva
+from core.analise import gerar_frequencia_simulada
 
 
 def iniciar_interface():
 
     root = tk.Tk()
-    root.title("Lotofácil PRO")
-    root.geometry("1000x650")
-    root.configure(bg="#eef1f5")
+    root.title("Lotofácil PRO v2.1")
+    root.geometry("1100x650")
 
-    style = ttk.Style()
-    style.theme_use("clam")
-    style.configure("TProgressbar", thickness=8, background="#4a90e2")
+    progresso_var = tk.DoubleVar()
+    status_var = tk.StringVar(value="Pronto.")
+    eta_var = tk.StringVar(value="ETA: --")
 
-    # ==============================
-    # HEADER
-    # ==============================
+    resultados_cache = []
+    frequencia_cache = gerar_frequencia_simulada()
 
-    header = tk.Frame(root, bg="#2c3e50", height=70)
-    header.pack(fill="x")
-
-    tk.Label(
-        header,
-        text="LOTOFÁCIL PRO",
-        bg="#2c3e50",
-        fg="white",
-        font=("Segoe UI", 18, "bold")
-    ).pack(pady=15)
-
-    # ==============================
-    # CONTAINER
-    # ==============================
-
-    container = tk.Frame(root, bg="#eef1f5")
-    container.pack(fill="both", expand=True, padx=20, pady=20)
-
-    # ==============================
-    # PAINEL ESQUERDO
-    # ==============================
-
-    painel = tk.Frame(container, bg="white", width=300)
-    painel.pack(side="left", fill="y")
-    painel.pack_propagate(False)
-
-    tk.Label(
-        painel,
-        text="Configuração",
-        bg="white",
-        fg="#2c3e50",
-        font=("Segoe UI", 14, "bold")
-    ).pack(pady=15)
-
-    nivel_var = tk.StringVar(value="A")
-
-    niveis = [
-        ("A - Conservador", "A"),
-        ("B - Equilibrado", "B"),
-        ("C - Estratégico", "C"),
-        ("D - Agressivo", "D")
-    ]
-
-    for texto, valor in niveis:
-        tk.Radiobutton(
-            painel,
-            text=texto,
-            variable=nivel_var,
-            value=valor,
-            bg="white",
-            font=("Segoe UI", 10),
-            anchor="w"
-        ).pack(fill="x", padx=20)
-
-    tk.Label(
-        painel,
-        text="\nQuantidade de Jogos",
-        bg="white",
-        font=("Segoe UI", 11)
-    ).pack()
-
-    qtd_entry = tk.Entry(painel, width=8, justify="center", font=("Segoe UI", 11))
-    qtd_entry.insert(0, "1")
-    qtd_entry.pack(pady=5)
-
-    # ==============================
-    # PAINEL DIREITO
-    # ==============================
-
-    area = tk.Frame(container, bg="white")
-    area.pack(side="right", fill="both", expand=True, padx=(20, 0))
-
-    tk.Label(
-        area,
-        text="Resultados",
-        bg="white",
-        fg="#2c3e50",
-        font=("Segoe UI", 14, "bold")
-    ).pack(pady=10)
-
-    contador_label = tk.Label(
-        area,
-        text="Nenhum jogo gerado.",
-        bg="white",
-        fg="#555",
-        font=("Segoe UI", 10, "italic")
-    )
-    contador_label.pack(pady=(0, 5))
-
-    text_frame = tk.Frame(area)
-    text_frame.pack(fill="both", expand=True, padx=20)
-
-    scrollbar = tk.Scrollbar(text_frame)
-    scrollbar.pack(side="right", fill="y")
-
-    resultado_box = tk.Text(
-        text_frame,
-        font=("Consolas", 12),
-        bg="#f8f9fb",
-        bd=0,
-        padx=15,
-        pady=15,
-        yscrollcommand=scrollbar.set
-    )
-    resultado_box.pack(fill="both", expand=True)
-
-    scrollbar.config(command=resultado_box.yview)
-
-    # ==============================
-    # STATUS BAR
-    # ==============================
-
-    status_frame = tk.Frame(root, bg="#dde3ea", height=40)
-    status_frame.pack(fill="x")
-
-    label_status = tk.Label(
-        status_frame,
-        text="Sistema pronto.",
-        bg="#dde3ea",
-        font=("Segoe UI", 9)
-    )
-    label_status.pack(side="left", padx=15)
-
-    progress = ttk.Progressbar(status_frame, mode="determinate")
-    progress.pack(side="right", padx=15, fill="x", expand=True)
-
-    # ==============================
-    # FUNÇÕES
-    # ==============================
-
+    # =========================
+    # GERAR
+    # =========================
     def gerar():
 
-        try:
-            nivel = nivel_var.get()
-            quantidade = int(qtd_entry.get())
+        btn_gerar.config(state="disabled")
+        progress_bar["value"] = 0
+        text_resultados.delete("1.0", tk.END)
 
-            if quantidade <= 0:
-                raise ValueError
+        def atualizar_progresso(progresso, tempo_decorrido):
+            def ui_update():
+                progresso_var.set(progresso * 100)
 
-            btn_gerar.config(state="disabled")
-            label_status.config(text="Gerando jogos...")
-            resultado_box.delete("1.0", tk.END)
-            root.update_idletasks()
+                if progresso > 0:
+                    tempo_total = tempo_decorrido / progresso
+                    restante = tempo_total - tempo_decorrido
+                    eta_var.set(f"ETA: {restante:.1f}s")
 
-            resultado = gerar_simulacao(nivel=nivel, quantidade=quantidade)
+                status_var.set("Gerando jogos...")
+            root.after(0, ui_update)
 
-            texto_formatado = ""
+        def tarefa():
+            nonlocal resultados_cache
 
-            for i, jogo in enumerate(resultado, start=1):
-                texto_formatado += f"JOGO {i:03d}\n"
-                texto_formatado += "-" * 30 + "\n"
-                texto_formatado += f"{jogo}\n\n"
-
-            resultado_box.insert(tk.END, texto_formatado)
-            resultado_box.see("1.0")
-
-            contador_label.config(
-                text=f"{quantidade} jogo(s) gerado(s)"
+            resultados = gerar_simulacao_progressiva(
+                nivel="C",
+                quantidade=10,
+                callback_progresso=atualizar_progresso
             )
 
-            label_status.config(text="Geração concluída.")
-            btn_gerar.config(state="normal")
+            resultados_cache = resultados
 
-        except ValueError:
-            messagebox.showerror("Erro", "Quantidade deve ser número positivo.")
-            btn_gerar.config(state="normal")
-            label_status.config(text="Erro.")
-        except Exception as e:
-            messagebox.showerror("Erro", str(e))
-            btn_gerar.config(state="normal")
-            label_status.config(text="Erro.")
+            def finalizar():
+                jogos_unicos = set()
 
-    def atualizar_barra(percentual, numero_atual):
-        progress["value"] = percentual
-        label_status.config(
-            text=f"Atualizando concurso {numero_atual} - {percentual}%"
+                for jogo, score in resultados:
+                    tupla = tuple(jogo)
+                    if tupla not in jogos_unicos:
+                        jogos_unicos.add(tupla)
+                        numeros = " ".join(f"{n:02d}" for n in jogo)
+                        text_resultados.insert(tk.END, f"{numeros} | Score: {score}\n")
+
+                atualizar_estatisticas()
+                status_var.set("Concluído.")
+                btn_gerar.config(state="normal")
+
+            root.after(0, finalizar)
+
+        threading.Thread(target=tarefa, daemon=True).start()
+
+    # =========================
+    # ATUALIZAR
+    # =========================
+    def atualizar():
+
+        status_var.set("Atualizando base estatística...")
+        btn_gerar.config(state="disabled")
+
+        def tarefa():
+            nonlocal frequencia_cache
+            time.sleep(1)  # simulação leve
+            frequencia_cache = gerar_frequencia_simulada()
+
+            def finalizar():
+                status_var.set("Base estatística atualizada.")
+                btn_gerar.config(state="normal")
+
+            root.after(0, finalizar)
+
+        threading.Thread(target=tarefa, daemon=True).start()
+
+    # =========================
+    # ESTATÍSTICAS
+    # =========================
+    def atualizar_estatisticas():
+
+        if not resultados_cache:
+            return
+
+        scores = [s for _, s in resultados_cache]
+        somas = [sum(j) for j, _ in resultados_cache]
+        pares = [sum(1 for n in j if n % 2 == 0) for j, _ in resultados_cache]
+
+        lbl_media_score.config(text=f"Média Score: {sum(scores)/len(scores):.2f}")
+        lbl_melhor_score.config(text=f"Melhor Score: {max(scores):.2f}")
+        lbl_pior_score.config(text=f"Pior Score: {min(scores):.2f}")
+        lbl_media_soma.config(text=f"Média Soma: {sum(somas)/len(somas):.1f}")
+        lbl_media_pares.config(text=f"Média Pares: {sum(pares)/len(pares):.1f}")
+
+    # =========================
+    # LIMPAR
+    # =========================
+    def limpar():
+        text_resultados.delete("1.0", tk.END)
+
+    # =========================
+    # COPIAR
+    # =========================
+    def copiar():
+        root.clipboard_clear()
+        root.clipboard_append(text_resultados.get("1.0", tk.END))
+        messagebox.showinfo("Copiado", "Resultados copiados!")
+
+    # =========================
+    # EXPORTAR
+    # =========================
+    def exportar():
+
+        if not resultados_cache:
+            messagebox.showwarning("Aviso", "Nenhum jogo para exportar.")
+            return
+
+        caminho = filedialog.asksaveasfilename(
+            defaultextension=".csv",
+            filetypes=[("CSV", "*.csv")],
+            title="Salvar como"
         )
-        root.update_idletasks()
 
-    def baixar():
-        btn_baixar.config(state="disabled")
-        sucesso, mensagem = baixar_dados_novos(callback_progresso=atualizar_barra)
+        if not caminho:
+            return
 
-        if sucesso:
-            label_status.config(text="Atualização concluída.")
-            messagebox.showinfo("Sucesso", mensagem)
-        else:
-            label_status.config(text="Erro na atualização.")
-            messagebox.showerror("Erro", mensagem)
+        with open(caminho, "w", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
+            writer.writerow(["Jogo", "Score"])
+            for jogo, score in resultados_cache:
+                writer.writerow([" ".join(map(str, jogo)), score])
 
-        btn_baixar.config(state="normal")
+        messagebox.showinfo("Exportado", "Arquivo salvo com sucesso!")
 
-    def thread_baixar():
-        threading.Thread(target=baixar).start()
+    # =========================
+    # SAIR
+    # =========================
+    def sair():
+        root.destroy()
 
-    # ==============================
-    # BOTÕES
-    # ==============================
+    # =========================
+    # LAYOUT
+    # =========================
 
-    btn_frame = tk.Frame(painel, bg="white")
-    btn_frame.pack(pady=20)
+    top_frame = tk.Frame(root)
+    top_frame.pack(fill="x", padx=10, pady=5)
 
-    btn_gerar = tk.Button(
-        btn_frame,
-        text="Gerar Jogos",
-        bg="#27ae60",
-        fg="white",
-        width=18,
-        height=2,
-        font=("Segoe UI", 10, "bold"),
-        command=gerar
-    )
-    btn_gerar.pack(pady=5)
+    btn_gerar = tk.Button(top_frame, text="Gerar", command=gerar)
+    btn_gerar.pack(side="left", padx=5)
 
-    btn_baixar = tk.Button(
-        btn_frame,
-        text="Atualizar Dados",
-        bg="#3498db",
-        fg="white",
-        width=18,
-        height=1,
-        font=("Segoe UI", 10),
-        command=thread_baixar
-    )
-    btn_baixar.pack(pady=5)
+    tk.Button(top_frame, text="Atualizar", command=atualizar).pack(side="left", padx=5)
+    tk.Button(top_frame, text="Limpar", command=limpar).pack(side="left", padx=5)
+    tk.Button(top_frame, text="Copiar Tudo", command=copiar).pack(side="left", padx=5)
+    tk.Button(top_frame, text="Exportar CSV", command=exportar).pack(side="left", padx=5)
+    tk.Button(top_frame, text="Sair", command=sair).pack(side="right", padx=5)
 
-    btn_sair = tk.Button(
-        btn_frame,
-        text="Sair",
-        bg="#e74c3c",
-        fg="white",
-        width=18,
-        height=1,
-        font=("Segoe UI", 10),
-        command=root.destroy
-    )
-    btn_sair.pack(pady=5)
+    main_frame = tk.Frame(root)
+    main_frame.pack(fill="both", expand=True, padx=10, pady=5)
+
+    text_resultados = tk.Text(main_frame)
+    text_resultados.pack(side="left", fill="both", expand=True)
+
+    painel = tk.Frame(main_frame, width=250)
+    painel.pack(side="right", fill="y", padx=10)
+
+    tk.Label(painel, text="Estatísticas", font=("Arial", 12, "bold")).pack(pady=10)
+
+    lbl_media_score = tk.Label(painel, text="Média Score: -")
+    lbl_media_score.pack(anchor="w")
+
+    lbl_melhor_score = tk.Label(painel, text="Melhor Score: -")
+    lbl_melhor_score.pack(anchor="w")
+
+    lbl_pior_score = tk.Label(painel, text="Pior Score: -")
+    lbl_pior_score.pack(anchor="w")
+
+    lbl_media_soma = tk.Label(painel, text="Média Soma: -")
+    lbl_media_soma.pack(anchor="w")
+
+    lbl_media_pares = tk.Label(painel, text="Média Pares: -")
+    lbl_media_pares.pack(anchor="w")
+
+    bottom_frame = tk.Frame(root)
+    bottom_frame.pack(fill="x", padx=10, pady=5)
+
+    progress_bar = ttk.Progressbar(bottom_frame, variable=progresso_var, maximum=100)
+    progress_bar.pack(fill="x")
+
+    tk.Label(bottom_frame, textvariable=eta_var).pack(anchor="w")
+    tk.Label(bottom_frame, textvariable=status_var).pack(anchor="w")
 
     root.mainloop()

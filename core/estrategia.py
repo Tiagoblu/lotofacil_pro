@@ -1,36 +1,29 @@
 import random
 
 
-def gerar_jogo(contador, nivel="A"):
+def gerar_jogo(nivel="C"):
+    """
+    Geração com leve viés probabilístico.
+    Números centrais levemente favorecidos.
+    """
 
-    numeros_ordenados = [num for num, _ in contador.most_common()]
-    todos_numeros = list(contador.keys())
+    universo = list(range(1, 26))
 
     if nivel == "A":
-        # 100% frequência (conservador)
-        escolhidos = numeros_ordenados[:15]
+        return sorted(random.sample(universo, 15))
 
-    elif nivel == "B":
-        # 10 mais frequentes + 5 aleatórios entre os 20 mais frequentes
-        base = numeros_ordenados[:10]
-        extras_pool = numeros_ordenados[:20]
-        extras = random.sample([n for n in extras_pool if n not in base], 5)
-        escolhidos = base + extras
-
+    if nivel == "B":
+        pesos = [1 + (i in range(8, 18)) for i in universo]
     elif nivel == "C":
-        # 8 mais frequentes + 7 aleatórios do restante
-        base = numeros_ordenados[:8]
-        restante = [n for n in todos_numeros if n not in base]
-        extras = random.sample(restante, 7)
-        escolhidos = base + extras
+        pesos = [1 + (i in range(5, 21)) for i in universo]
+    else:  # D
+        pesos = [2 if 10 <= i <= 20 else 1 for i in universo]
 
-    elif nivel == "D":
-        # 15 totalmente aleatórios (agressivo)
-        escolhidos = random.sample(todos_numeros, 15)
+    selecionados = random.choices(universo, weights=pesos, k=25)
 
-    else:
-        # fallback segurança
-        escolhidos = numeros_ordenados[:15]
+    jogo = list(set(selecionados))
 
-    escolhidos.sort()
-    return escolhidos
+    while len(jogo) < 15:
+        jogo.append(random.choice(universo))
+
+    return sorted(random.sample(jogo, 15))
