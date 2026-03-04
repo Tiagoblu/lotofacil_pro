@@ -1,17 +1,15 @@
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 import threading
-import time
 import csv
 
-from core.simulacao import gerar_simulacao_progressiva
-from core.analise import gerar_frequencia_simulada
+from services.geracao_service import GeracaoService
 
 
 def iniciar_interface():
 
     root = tk.Tk()
-    root.title("Lotofácil PRO v2.1")
+    root.title("Lotofácil PRO v2.2")
     root.geometry("1100x650")
 
     progresso_var = tk.DoubleVar()
@@ -19,7 +17,6 @@ def iniciar_interface():
     eta_var = tk.StringVar(value="ETA: --")
 
     resultados_cache = []
-    frequencia_cache = gerar_frequencia_simulada()
 
     # =========================
     # GERAR
@@ -45,10 +42,10 @@ def iniciar_interface():
         def tarefa():
             nonlocal resultados_cache
 
-            resultados = gerar_simulacao_progressiva(
+            resultados = GeracaoService.gerar_simulacao(
                 nivel="C",
                 quantidade=10,
-                callback_progresso=atualizar_progresso
+                callback=atualizar_progresso
             )
 
             resultados_cache = resultados
@@ -65,27 +62,6 @@ def iniciar_interface():
 
                 atualizar_estatisticas()
                 status_var.set("Concluído.")
-                btn_gerar.config(state="normal")
-
-            root.after(0, finalizar)
-
-        threading.Thread(target=tarefa, daemon=True).start()
-
-    # =========================
-    # ATUALIZAR
-    # =========================
-    def atualizar():
-
-        status_var.set("Atualizando base estatística...")
-        btn_gerar.config(state="disabled")
-
-        def tarefa():
-            nonlocal frequencia_cache
-            time.sleep(1)  # simulação leve
-            frequencia_cache = gerar_frequencia_simulada()
-
-            def finalizar():
-                status_var.set("Base estatística atualizada.")
                 btn_gerar.config(state="normal")
 
             root.after(0, finalizar)
@@ -166,7 +142,6 @@ def iniciar_interface():
     btn_gerar = tk.Button(top_frame, text="Gerar", command=gerar)
     btn_gerar.pack(side="left", padx=5)
 
-    tk.Button(top_frame, text="Atualizar", command=atualizar).pack(side="left", padx=5)
     tk.Button(top_frame, text="Limpar", command=limpar).pack(side="left", padx=5)
     tk.Button(top_frame, text="Copiar Tudo", command=copiar).pack(side="left", padx=5)
     tk.Button(top_frame, text="Exportar CSV", command=exportar).pack(side="left", padx=5)
