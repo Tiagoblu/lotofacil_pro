@@ -1,13 +1,14 @@
+# core/statistics/score_calculator.py
+
 import math
 from core.config.score_config import ScoreConfig
 
 
 class ScoreCalculator:
 
-    # =====================================
-    # FREQUÊNCIA
-    # =====================================
-
+    # -----------------------------
+    # Frequência histórica
+    # -----------------------------
     @staticmethod
     def score_frequencia(jogo, mapa_frequencia, max_freq):
 
@@ -19,10 +20,10 @@ class ScoreCalculator:
 
         return media_freq / max_freq
 
-    # =====================================
-    # SOMA
-    # =====================================
 
+    # -----------------------------
+    # Soma das dezenas
+    # -----------------------------
     @staticmethod
     def score_soma(jogo):
 
@@ -33,10 +34,10 @@ class ScoreCalculator:
             (2 * (ScoreConfig.DESVIO_SOMA ** 2))
         )
 
-    # =====================================
-    # PARES
-    # =====================================
 
+    # -----------------------------
+    # Quantidade de pares
+    # -----------------------------
     @staticmethod
     def score_pares(jogo):
 
@@ -47,10 +48,10 @@ class ScoreCalculator:
             (2 * (ScoreConfig.DESVIO_PARES ** 2))
         )
 
-    # =====================================
-    # ATRASO
-    # =====================================
 
+    # -----------------------------
+    # Atraso médio das dezenas
+    # -----------------------------
     @staticmethod
     def score_atraso(jogo, mapa_atraso, max_atraso):
 
@@ -58,44 +59,68 @@ class ScoreCalculator:
             return 0.0
 
         soma_atraso = sum(mapa_atraso.get(d, 0) for d in jogo.dezenas)
+
         media_atraso = soma_atraso / len(jogo.dezenas)
 
         return media_atraso / max_atraso
 
-    # =====================================
-    # DISTRIBUIÇÃO BAIXAS / ALTAS
-    # =====================================
 
+    # -----------------------------
+    # Distribuição por linhas
+    # -----------------------------
     @staticmethod
     def score_distribuicao(jogo):
 
-        baixas = len([d for d in jogo.dezenas if d <= 13])
-        altas = len([d for d in jogo.dezenas if d > 13])
+        linhas = [0, 0, 0, 0, 0]
 
-        diferenca = abs(baixas - altas)
+        for d in jogo.dezenas:
 
-        # distribuição ideal ~ 7 / 8
-        return math.exp(-(diferenca ** 2) / 8)
+            if d <= 5:
+                linhas[0] += 1
+            elif d <= 10:
+                linhas[1] += 1
+            elif d <= 15:
+                linhas[2] += 1
+            elif d <= 20:
+                linhas[3] += 1
+            else:
+                linhas[4] += 1
 
-    # =====================================
-    # PENALIDADE EXTREMOS
-    # =====================================
+        ideal = 3
 
+        erro = sum(abs(l - ideal) for l in linhas)
+
+        return 1 / (1 + erro)
+
+
+    # -----------------------------
+    # Penalização de sequência
+    # -----------------------------
     @staticmethod
-    def penalidade_extremos(jogo):
+    def penalidade_sequencia(jogo):
 
-        if jogo.soma < 150 or jogo.soma > 240:
+        dezenas = sorted(jogo.dezenas)
+
+        maior_seq = 1
+        atual = 1
+
+        for i in range(1, len(dezenas)):
+
+            if dezenas[i] == dezenas[i - 1] + 1:
+                atual += 1
+                maior_seq = max(maior_seq, atual)
+            else:
+                atual = 1
+
+        if maior_seq >= 6:
             return ScoreConfig.PENALIDADE_EXTREMO
 
-        if jogo.pares < 4 or jogo.pares > 11:
-            return ScoreConfig.PENALIDADE_EXTREMO
+        return 0
 
-        return 0.0
 
-    # =====================================
-    # SCORE FINAL
-    # =====================================
-
+    # -----------------------------
+    # Score final
+    # -----------------------------
     @classmethod
     def calcular_score(
         cls,
@@ -107,7 +132,9 @@ class ScoreCalculator:
     ):
 
         sf = cls.score_frequencia(jogo, mapa_frequencia, max_freq)
+
         ss = cls.score_soma(jogo)
+
         sp = cls.score_pares(jogo)
 
         sa = 0.0
@@ -116,7 +143,7 @@ class ScoreCalculator:
 
         sd = cls.score_distribuicao(jogo)
 
-        penalidade = cls.penalidade_extremos(jogo)
+        penalidade = cls.penalidade_sequencia(jogo)
 
         score_final = (
             ScoreConfig.PESO_FREQUENCIA * sf +
