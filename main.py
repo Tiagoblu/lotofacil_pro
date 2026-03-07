@@ -2,34 +2,45 @@
 
 from infrastructure.database.repository import ConcursoRepository
 from infrastructure.downloader.baixar import baixar_dados_novos
-from core.engine.motor_jogos import selecionar_melhores_jogos
+from services.geracao_service import GeracaoService
+from core.ia.analise_inteligente import AnaliseInteligente
 
 
 def main():
 
-    print("==== LotoFácil Pro ====\n")
+    print("==== LotoFácil Pro V7 ====\n")
 
     print("Atualizando banco...")
-
     ok, msg = baixar_dados_novos()
-
     print(msg)
 
     concursos = ConcursoRepository.obter_todos()
-
     print("\nTotal de concursos:", len(concursos))
 
-    print("\nGerando jogos...\n")
+    print("\nGerando jogos com Motor Probabilístico...\n")
 
-    melhores = selecionar_melhores_jogos(concursos, 5)
+    resultados = GeracaoService.gerar_jogos(quantidade=5, candidatos=500)
 
-    print("Jogos Gerados:\n")
+    if not resultados:
+        print("Nenhum jogo gerado.")
+        return
 
-    for i, r in enumerate(melhores, 1):
+    print("Executando Análise Inteligente V7...\n")
 
-        jogo = " ".join(f"{d:02d}" for d in r["jogo"])
+    analise = AnaliseInteligente.analisar(resultados, concursos)
 
-        print(f"Jogo {i}: {jogo} | Score: {r['score']}")
+    print("Jogos Gerados com Análise:\n")
+
+    for i, item in enumerate(analise, 1):
+
+        jogo = " ".join(f"{d:02d}" for d in item["jogo"])
+
+        print(f"Jogo {i}: {jogo}")
+        print(f"Score: {item['score_original']}")
+        print(f"Perfil Detectado: {item['perfil_detectado']}")
+        print(f"Nível de Risco: {item['nivel_risco']}")
+        print(f"Análise IA: {item['analise_textual']}")
+        print("-" * 60)
 
 
 if __name__ == "__main__":

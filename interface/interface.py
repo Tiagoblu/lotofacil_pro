@@ -4,19 +4,32 @@ import threading
 import csv
 
 from services.geracao_service import GeracaoService
+from infrastructure.downloader.baixar import baixar_dados_novos
 
 
 def iniciar_interface():
 
     root = tk.Tk()
-    root.title("Lotofácil PRO v2.2")
+    root.title("Lotofácil PRO v2.3")
     root.geometry("1100x650")
 
     progresso_var = tk.DoubleVar()
-    status_var = tk.StringVar(value="Pronto.")
+    status_var = tk.StringVar(value="Inicializando...")
     eta_var = tk.StringVar(value="ETA: --")
 
     resultados_cache = []
+
+    # =========================
+    # ATUALIZAR BANCO AUTOMATICAMENTE
+    # =========================
+    def atualizar_banco():
+
+        status_var.set("Atualizando concursos...")
+        root.update()
+
+        ok, msg = baixar_dados_novos()
+
+        status_var.set(msg)
 
     # =========================
     # GERAR
@@ -37,6 +50,7 @@ def iniciar_interface():
                     eta_var.set(f"ETA: {restante:.1f}s")
 
                 status_var.set("Gerando jogos...")
+
             root.after(0, ui_update)
 
         def tarefa():
@@ -55,10 +69,14 @@ def iniciar_interface():
 
                 for jogo, score in resultados:
                     tupla = tuple(jogo)
+
                     if tupla not in jogos_unicos:
                         jogos_unicos.add(tupla)
                         numeros = " ".join(f"{n:02d}" for n in jogo)
-                        text_resultados.insert(tk.END, f"{numeros} | Score: {score}\n")
+                        text_resultados.insert(
+                            tk.END,
+                            f"{numeros} | Score: {score}\n"
+                        )
 
                 atualizar_estatisticas()
                 status_var.set("Concluído.")
@@ -121,6 +139,7 @@ def iniciar_interface():
         with open(caminho, "w", newline="", encoding="utf-8") as f:
             writer = csv.writer(f)
             writer.writerow(["Jogo", "Score"])
+
             for jogo, score in resultados_cache:
                 writer.writerow([" ".join(map(str, jogo)), score])
 
@@ -181,5 +200,8 @@ def iniciar_interface():
 
     tk.Label(bottom_frame, textvariable=eta_var).pack(anchor="w")
     tk.Label(bottom_frame, textvariable=status_var).pack(anchor="w")
+
+    # 🔥 Atualiza banco automaticamente ao abrir
+    threading.Thread(target=atualizar_banco, daemon=True).start()
 
     root.mainloop()
