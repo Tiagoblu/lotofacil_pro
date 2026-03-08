@@ -1,45 +1,60 @@
 # main.py
 
 from infrastructure.database.repository import ConcursoRepository
-from infrastructure.downloader.baixar import baixar_dados_novos
-from services.geracao_service import GeracaoService
+from core.engine.probabilistic_engine import ProbabilisticEngine
 from core.ia.analise_inteligente import AnaliseInteligente
+from core.engine.diversificador_adaptativo import DiversificadorAdaptativo
 
 
 def main():
 
-    print("==== LotoFácil Pro V7 ====\n")
+    print("==== LotoFácil Pro V8 ====\n")
+
+    modo_diversificado = True
+    candidatos = 100
+    jogos_finais = 5
 
     print("Atualizando banco...")
-    ok, msg = baixar_dados_novos()
-    print(msg)
-
     concursos = ConcursoRepository.obter_todos()
-    print("\nTotal de concursos:", len(concursos))
+    print("Banco já está atualizado.\n")
 
-    print("\nGerando jogos com Motor Probabilístico...\n")
+    print(f"Total de concursos: {len(concursos)}\n")
 
-    resultados = GeracaoService.gerar_jogos(quantidade=5, candidatos=500)
+    print("Gerando candidatos com Motor Probabilístico...\n")
 
-    if not resultados:
-        print("Nenhum jogo gerado.")
-        return
+    jogos_motor = ProbabilisticEngine.gerar_jogos(
+        concursos,
+        quantidade=candidatos
+    )
 
-    print("Executando Análise Inteligente V7...\n")
+    jogos_formatados = [
+        (tuple(jogo.dezenas), score)
+        for jogo, score in jogos_motor
+    ]
 
-    analise = AnaliseInteligente.analisar(resultados, concursos)
+    print("Executando Análise Inteligente...\n")
 
-    print("Jogos Gerados com Análise:\n")
+    analise = AnaliseInteligente.analisar(jogos_formatados, concursos)
+
+    if modo_diversificado:
+        print("Aplicando Diversificação Adaptativa V8...\n")
+        analise = DiversificadorAdaptativo.selecionar(
+            analise,
+            quantidade_final=jogos_finais
+        )
+    else:
+        analise = analise[:jogos_finais]
+
+    print("Jogos Finais:\n")
 
     for i, item in enumerate(analise, 1):
 
-        jogo = " ".join(f"{d:02d}" for d in item["jogo"])
+        dezenas = " ".join(f"{n:02d}" for n in item["jogo"])
 
-        print(f"Jogo {i}: {jogo}")
-        print(f"Score: {item['score_original']}")
+        print(f"Jogo {i}: {dezenas}")
+        print(f"Score: {round(item['score_original'], 6)}")
         print(f"Perfil Detectado: {item['perfil_detectado']}")
         print(f"Nível de Risco: {item['nivel_risco']}")
-        print(f"Análise IA: {item['analise_textual']}")
         print("-" * 60)
 
 
