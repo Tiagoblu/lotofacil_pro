@@ -8,11 +8,16 @@ from core.engine.diversificador_adaptativo import DiversificadorAdaptativo
 
 def main():
 
-    print("==== LotoFácil Pro V8 ====\n")
+    print("==== LotoFácil Pro V9 ====\n")
 
-    modo_diversificado = True
+    # =========================
+    # CONFIGURAÇÕES
+    # =========================
+    modo_score = "v9"       # "v7" ou "v9"
+    modo_diversificado = False
     candidatos = 100
     jogos_finais = 5
+    # =========================
 
     print("Atualizando banco...")
     concursos = ConcursoRepository.obter_todos()
@@ -24,7 +29,9 @@ def main():
 
     jogos_motor = ProbabilisticEngine.gerar_jogos(
         concursos,
-        quantidade=candidatos
+        quantidade=candidatos,
+        candidatos=candidatos,
+        modo_score=modo_score
     )
 
     jogos_formatados = [
@@ -37,7 +44,7 @@ def main():
     analise = AnaliseInteligente.analisar(jogos_formatados, concursos)
 
     if modo_diversificado:
-        print("Aplicando Diversificação Adaptativa V8...\n")
+        print("Aplicando Diversificação Adaptativa...\n")
         analise = DiversificadorAdaptativo.selecionar(
             analise,
             quantidade_final=jogos_finais

@@ -3,6 +3,7 @@
 import random
 from core.domain.value_objects import Jogo
 from core.statistics.score_calculator import ScoreCalculator
+from core.statistics.score_v9 import ScoreV9
 
 
 class ProbabilisticEngine:
@@ -36,7 +37,13 @@ class ProbabilisticEngine:
         return mapa
 
     @classmethod
-    def gerar_jogos(cls, concursos, quantidade=5, candidatos=200):
+    def gerar_jogos(
+        cls,
+        concursos,
+        quantidade=5,
+        candidatos=200,
+        modo_score="v7"
+    ):
 
         mapa_freq = cls.gerar_mapa_frequencia_recente(concursos)
         max_freq = max(mapa_freq.values()) if mapa_freq else 1
@@ -47,16 +54,21 @@ class ProbabilisticEngine:
         jogos_candidatos = []
 
         for _ in range(candidatos):
+
             dezenas = tuple(sorted(random.sample(range(1, 26), 15)))
             jogo = Jogo(dezenas)
 
-            score = ScoreCalculator.calcular_score(
-                jogo,
-                mapa_freq,
-                max_freq,
-                mapa_atraso,
-                max_atraso
-            )
+            if modo_score == "v9":
+                score = ScoreV9.calcular(jogo.dezenas, concursos)
+
+            else:  # V7 padrão
+                score = ScoreCalculator.calcular_score(
+                    jogo,
+                    mapa_freq,
+                    max_freq,
+                    mapa_atraso,
+                    max_atraso
+                )
 
             jogos_candidatos.append((jogo, score))
 
