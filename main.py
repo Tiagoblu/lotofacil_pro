@@ -1,3 +1,5 @@
+# main.py
+
 from core.infrastructure.database.database import inicializar_banco
 from core.infrastructure.database.repository import ConcursoRepository
 from core.engine.probabilistic_engine import ProbabilisticEngine
@@ -15,13 +17,22 @@ def main():
 
     print("Gerando candidatos com Motor Probabilístico...\n")
 
+    # MODOS DISPONÍVEIS:
+    # "CONSERVADOR"
+    # "BALANCEADO"
+    # "AGRESSIVO"
+
+    modo_estrategia = "BALANCEADO"
+
     jogos_motor = ProbabilisticEngine.gerar_jogos(
         concursos,
         quantidade=5,
-        candidatos=300
+        candidatos=300,
+        modo=modo_estrategia
     )
 
-    print("\nJogos Finais:\n")
+    print(f"\nModo Estratégico Ativo: {modo_estrategia}\n")
+    print("Jogos Finais:\n")
 
     for i, (jogo, score, repeticoes) in enumerate(jogos_motor, start=1):
         dezenas_formatadas = " ".join(f"{n:02d}" for n in jogo.dezenas)
