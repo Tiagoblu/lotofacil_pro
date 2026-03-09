@@ -1,7 +1,7 @@
 # infrastructure/database/repository.py
 
 from typing import List, Optional
-from infrastructure.database.database import get_connection
+from core.infrastructure.database.database import get_connection
 from core.domain.models import Concurso
 
 

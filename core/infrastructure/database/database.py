@@ -1,14 +1,24 @@
-# infrastructure/database/database.py
+# core/infrastructure/database/database.py
 
 import sqlite3
-import os
+from pathlib import Path
 
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-DB_PATH = os.path.join(BASE_DIR, "database", "lotofacil.db")
+
+# Sobe até a raiz do projeto (lotofacil_pro)
+BASE_DIR = Path(__file__).resolve().parents[3]
+
+# Caminho correto do banco
+DB_PATH = BASE_DIR / "database" / "lotofacil.db"
 
 
 def get_connection():
-    return sqlite3.connect(DB_PATH)
+    """
+    Retorna conexão SQLite garantindo que o caminho exista.
+    """
+    # Garante que a pasta database exista
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+
+    return sqlite3.connect(str(DB_PATH))
 
 
 def criar_tabelas():

@@ -2,8 +2,7 @@
 
 import random
 from core.domain.value_objects import Jogo
-from core.statistics.score_calculator import ScoreCalculator
-from core.statistics.score_v9 import ScoreV9
+from core.statistics.score_v10 import ScoreV10
 
 
 class ProbabilisticEngine:
@@ -41,8 +40,8 @@ class ProbabilisticEngine:
         cls,
         concursos,
         quantidade=5,
-        candidatos=200,
-        modo_score="v7"
+        candidatos=500,
+        modo_score=None  # Mantido para compatibilidade com main/backtest
     ):
 
         mapa_freq = cls.gerar_mapa_frequencia_recente(concursos)
@@ -53,25 +52,37 @@ class ProbabilisticEngine:
 
         jogos_candidatos = []
 
+        ciclo_detectado = None
+        indice_volatilidade = None
+        peso_recencia = None
+
         for _ in range(candidatos):
 
             dezenas = tuple(sorted(random.sample(range(1, 26), 15)))
             jogo = Jogo(dezenas)
 
-            if modo_score == "v9":
-                score = ScoreV9.calcular(jogo.dezenas, concursos)
+            score, ciclo, indice, peso, repeticoes = ScoreV10.calcular(
+                jogo,
+                concursos,
+                mapa_freq,
+                mapa_atraso,
+                max_freq,
+                max_atraso
+            )
 
-            else:  # V7 padrão
-                score = ScoreCalculator.calcular_score(
-                    jogo,
-                    mapa_freq,
-                    max_freq,
-                    mapa_atraso,
-                    max_atraso
-                )
+            if ciclo_detectado is None:
+                ciclo_detectado = ciclo
+                indice_volatilidade = indice
+                peso_recencia = peso
 
-            jogos_candidatos.append((jogo, score))
+            jogos_candidatos.append((jogo, score, repeticoes))
 
         jogos_candidatos.sort(key=lambda x: x[1], reverse=True)
+
+        print("\nCICLO DETECTADO PELO SISTEMA:")
+        print(f"Tipo: {ciclo_detectado}")
+        print(f"Índice de Volatilidade: {round(indice_volatilidade, 3)}")
+        print(f"Peso Recência Aplicado: {round(peso_recencia, 2)}")
+        print("-" * 60)
 
         return jogos_candidatos[:quantidade]
