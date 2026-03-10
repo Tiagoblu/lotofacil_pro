@@ -1,10 +1,11 @@
 # core/engine/probabilistic_engine.py
 
 import random
-from typing import List, Tuple
+from typing import Dict, List, Tuple, Any
 
 from core.domain.models import Concurso
 from core.statistics.score_v10 import calcular as calcular_score_v10
+from core.statistics.score_v10 import detectar_ciclo
 
 
 class ProbabilisticEngine:
@@ -12,19 +13,19 @@ class ProbabilisticEngine:
     Motor probabilístico de geração de jogos.
 
     Fluxo:
-        - Usa o histórico completo de concursos como base.
-        - Gera candidatos aleatórios respeitando o tamanho do jogo (15 dezenas).
-        - Controla o número máximo de repetições em relação ao último concurso.
-        - Calcula um score estrutural adaptativo (V10) para cada jogo.
-        - Retorna apenas os melhores jogos segundo o score.
+        - Detecta o ciclo atual do histórico via score_v10.detectar_ciclo().
+        - Gera candidatos aleatórios com 15 dezenas.
+        - Filtra candidatos pelo limite de repetições do modo escolhido.
+        - Calcula o score V10 para cada candidato.
+        - Retorna os melhores jogos ordenados por score.
 
     Modos disponíveis:
-        - CONSERVADOR
-        - BALANCEADO
-        - AGRESSIVO
+        - CONSERVADOR : max 9 repetições em relação ao último concurso
+        - BALANCEADO  : max 11 repetições
+        - AGRESSIVO   : max 13 repetições
 
-    Os modos controlam apenas os limites de repetição;
-    o score interno (V10) já é adaptativo ao ciclo do histórico.
+    O score interno (V10) já é adaptativo ao ciclo do histórico,
+    independentemente do modo escolhido pelo usuário.
     """
 
     @staticmethod
@@ -33,7 +34,7 @@ class ProbabilisticEngine:
         quantidade: int = 5,
         candidatos: int = 300,
         modo: str = "BALANCEADO"
-    ) -> List[Tuple[Concurso, float, int]]:
+    ) -> Tuple[List[Tuple[Concurso, float, int]], Dict[str, Any]]:
         """
         Gera jogos avaliados pelo score V10.
 
@@ -44,24 +45,30 @@ class ProbabilisticEngine:
             modo: Modo estratégico ("CONSERVADOR", "BALANCEADO", "AGRESSIVO").
 
         Returns:
-            Lista de tuplas (jogo, score, repeticoes) ordenada por score desc.
+            Tupla com:
+                - Lista de (jogo, score, repeticoes) ordenada por score desc.
+                - Dicionário com informações do ciclo detectado pelo V10:
+                    {ciclo, indice_volatilidade, peso_recencia}
         """
         if not concursos:
             raise ValueError("Lista de concursos não pode ser vazia.")
+
+        # Detecta o ciclo uma única vez para todo o lote
+        resultado_ciclo = detectar_ciclo(concursos)
+
+        info_ciclo: Dict[str, Any] = {
+            "ciclo": resultado_ciclo.ciclo,
+            "indice_volatilidade": resultado_ciclo.indice_volatilidade,
+            "peso_recencia": resultado_ciclo.peso_recencia,
+        }
 
         ultimo_concurso = concursos[-1]
         dezenas_ultimo = set(ultimo_concurso.dezenas)
 
         configuracoes = {
-            "CONSERVADOR": {
-                "max_repeticoes": 9,
-            },
-            "BALANCEADO": {
-                "max_repeticoes": 11,
-            },
-            "AGRESSIVO": {
-                "max_repeticoes": 13,
-            }
+            "CONSERVADOR": {"max_repeticoes": 9},
+            "BALANCEADO":  {"max_repeticoes": 11},
+            "AGRESSIVO":   {"max_repeticoes": 13},
         }
 
         config = configuracoes.get(modo.upper(), configuracoes["BALANCEADO"])
@@ -73,7 +80,6 @@ class ProbabilisticEngine:
             dezenas = sorted(random.sample(range(1, 26), 15))
             repeticoes = len(set(dezenas) & dezenas_ultimo)
 
-            # Filtro de repetição por modo
             if repeticoes > max_repeticoes:
                 continue
 
@@ -83,7 +89,6 @@ class ProbabilisticEngine:
                 dezenas=tuple(dezenas)
             )
 
-            # Usa score V10 com o histórico completo
             resultado_v10 = calcular_score_v10(jogo, concursos)
             score = resultado_v10.score_final
 
@@ -95,4 +100,4 @@ class ProbabilisticEngine:
             reverse=True
         )
 
-        return jogos_ordenados[:quantidade]
+        return jogos_ordenados[:quantidade], info_ciclo

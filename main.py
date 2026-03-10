@@ -24,22 +24,26 @@ def main():
 
     modo_estrategia = "BALANCEADO"
 
-    jogos_motor = ProbabilisticEngine.gerar_jogos(
+    jogos_motor, info_ciclo = ProbabilisticEngine.gerar_jogos(
         concursos,
         quantidade=5,
         candidatos=300,
         modo=modo_estrategia
     )
 
-    print(f"\nModo Estratégico Ativo: {modo_estrategia}\n")
+    print(f"Modo Estratégico Ativo : {modo_estrategia}")
+    print(f"Ciclo Detectado (V10)  : {info_ciclo['ciclo']}")
+    print(f"Índice de Volatilidade : {info_ciclo['indice_volatilidade']:.4f}")
+    print(f"Peso Recência          : {info_ciclo['peso_recencia']:.2f}")
+    print()
     print("Jogos Finais:\n")
 
     for i, (jogo, score, repeticoes) in enumerate(jogos_motor, start=1):
         dezenas_formatadas = " ".join(f"{n:02d}" for n in jogo.dezenas)
 
         print(f"Jogo {i}: {dezenas_formatadas}")
-        print(f"Score: {score:.6f}")
-        print(f"Repetições Concurso Anterior: {repeticoes}")
+        print(f"Score V10             : {score:.6f}")
+        print(f"Repetições Anteriores : {repeticoes}")
         print("-" * 60)
 
 
