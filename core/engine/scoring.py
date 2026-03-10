@@ -1,6 +1,31 @@
-# core/scoring_avancado.py
+# core/engine/scoring.py
+"""
+Módulo de scoring agressivo legado.
 
-def calcular_penalizacao_sequencia(jogo):
+Este módulo implementa um cálculo de score simples, baseado em:
+    - frequência total
+    - frequência recente
+    - atraso
+    - ajustes estruturais (pares, soma)
+    - penalização progressiva por sequências longas
+
+Ele é mantido como alternativa/experimento em paralelo ao score V9
+(core.statistics.score_calculator) e ao score V10
+(core.statistics.score_v10).
+"""
+
+
+def calcular_penalizacao_sequencia(jogo: list[int]) -> float:
+    """
+    Calcula um fator multiplicativo de penalização com base na maior
+    sequência consecutiva presente no jogo.
+
+    Retorna um número em [0, 1]:
+        - 1.00: nenhuma sequência problemática
+        - 0.92: sequências moderadas (>= 6)
+        - 0.85: sequências longas (>= 8)
+        - 0.75: sequências muito longas (>= 10)
+    """
     jogo_ordenado = sorted(jogo)
     maior_seq = 1
     seq_atual = 1
@@ -12,7 +37,6 @@ def calcular_penalizacao_sequencia(jogo):
         else:
             seq_atual = 1
 
-    # Penalização progressiva suave
     if maior_seq >= 10:
         return 0.75
     elif maior_seq >= 8:
@@ -23,11 +47,30 @@ def calcular_penalizacao_sequencia(jogo):
         return 1.0
 
 
-def calcular_score(jogo, freq_total, freq_recente, atraso):
+def calcular_score(
+    jogo: list[int],
+    freq_total: dict[int, int],
+    freq_recente: dict[int, int],
+    atraso: dict[int, int],
+) -> float:
+    """
+    Calcula um score agressivo para um jogo, usando frequências
+    históricas, frequências recentes, atraso e critérios estruturais
+    simples (par/ímpar, faixa de soma e sequências).
 
-    score = 0
+    Args:
+        jogo: lista de dezenas inteiras (ex.: [1,2,...,25]).
+        freq_total: mapa de dezena -> frequência no histórico completo.
+        freq_recente: mapa de dezena -> frequência em janela recente.
+        atraso: mapa de dezena -> atraso em concursos.
 
-    # Frequência histórica
+    Returns:
+        Score como float (valores maiores indicam jogos mais "atrativos"
+        segundo este critério agressivo).
+    """
+    score = 0.0
+
+    # Frequência histórica (peso base)
     for dezena in jogo:
         score += freq_total.get(dezena, 0) * 1.0
 
@@ -44,14 +87,14 @@ def calcular_score(jogo, freq_total, freq_recente, atraso):
 
     # Par/ímpar ideal
     if 6 <= pares <= 9:
-        score += 15
+        score += 15.0
 
     # Faixa de soma ideal
     if 170 <= soma <= 230:
-        score += 20
+        score += 20.0
 
-    # Penalização estrutural por sequência longa
-    penalidade = calcular_penalizacao_sequencia(jogo)
-    score = score * penalidade
+    # Penalização estrutural por sequência longa (fator multiplicativo)
+    penalizacao = calcular_penalizacao_sequencia(jogo)
+    score = score * penalizacao
 
-    return score
+    return float(score)
