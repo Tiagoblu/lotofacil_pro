@@ -6,7 +6,7 @@ from core.engine.probabilistic_engine import ProbabilisticEngine
 
 
 def main():
-    print("==== LotoFácil Pro V9 ====\n")
+    print("==== LotoFácil Pro V10 – Motor Estrutural Adaptativo ====\n")
 
     print("Inicializando banco...")
     inicializar_banco()

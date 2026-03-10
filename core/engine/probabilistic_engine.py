@@ -23,7 +23,7 @@ class ProbabilisticEngine:
         - BALANCEADO
         - AGRESSIVO
 
-    Os modos controlam apenas os limites de repetição e filtro externo;
+    Os modos controlam apenas os limites de repetição;
     o score interno (V10) já é adaptativo ao ciclo do histórico.
     """
 
@@ -32,7 +32,7 @@ class ProbabilisticEngine:
         concursos: List[Concurso],
         quantidade: int = 5,
         candidatos: int = 300,
-        modo: str = "BALANCEADO",
+        modo: str = "BALANCEADO"
     ) -> List[Tuple[Concurso, float, int]]:
         """
         Gera jogos avaliados pelo score V10.
@@ -61,7 +61,7 @@ class ProbabilisticEngine:
             },
             "AGRESSIVO": {
                 "max_repeticoes": 13,
-            },
+            }
         }
 
         config = configuracoes.get(modo.upper(), configuracoes["BALANCEADO"])
@@ -73,17 +73,17 @@ class ProbabilisticEngine:
             dezenas = sorted(random.sample(range(1, 26), 15))
             repeticoes = len(set(dezenas) & dezenas_ultimo)
 
-            # Aplica filtro de repetição por modo (mesmo comportamento de antes)
+            # Filtro de repetição por modo
             if repeticoes > max_repeticoes:
                 continue
 
             jogo = Concurso(
                 numero=0,
                 data="",
-                dezenas=tuple(dezenas),
+                dezenas=tuple(dezenas)
             )
 
-            # Calcula o score V10 usando todo o histórico
+            # Usa score V10 com o histórico completo
             resultado_v10 = calcular_score_v10(jogo, concursos)
             score = resultado_v10.score_final
 
@@ -92,7 +92,7 @@ class ProbabilisticEngine:
         jogos_ordenados = sorted(
             jogos_avaliados,
             key=lambda x: x[1],
-            reverse=True,
+            reverse=True
         )
 
         return jogos_ordenados[:quantidade]
