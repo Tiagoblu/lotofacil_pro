@@ -1,0 +1,26 @@
+📌 Regra simples e definitiva
+🖥️ PC onde você PROGRAMOU:
+
+✔ git add .
+✔ git commit -m "mensagem"
+✔ git push
+
+🖥️ Outro PC:
+
+✔ Apenas rodar o .bat
+ou
+✔ git pull
+
+Nunca precisa dar commit ou push se você não alterou nada nele.
+
+🧠 Fluxo profissional correto entre dois PCs
+Trabalhou no PC A:
+git add .
+git commit -m "Nova feature X"
+git push
+
+Depois vai para o PC B:
+
+👉 Clica no .bat
+Ele já faz git pull
+Pronto.
