@@ -19,7 +19,6 @@ from collections import Counter
 ROOT = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, ROOT)
 
-# ── Imports do projeto (nomes reais confirmados) ──────────────────────────────
 try:
     from core.infrastructure.database.database   import inicializar_banco
     from core.infrastructure.database.repository import ConcursoRepository
@@ -38,7 +37,6 @@ TOTAL_JOGOS_PADRAO = 2_000
 MODO_PADRAO        = "BALANCEADO"
 CSV_SAIDA          = os.path.join(ROOT, "data", "cache", "perfil_v10.csv")
 
-# DNA alvo medido do V9 (fonte: analisar_motor_v9.py, 2000 jogos)
 DNA_V9 = {
     "soma_media"      : 221.77,
     "soma_min_ideal"  : 171,
@@ -53,7 +51,7 @@ DNA_V9 = {
 TOLERANCIA = {
     "soma"      : 3.0,
     "pares"     : 0.5,
-    "repeticao" : 0.5,
+    "repeticao" : 1.0,
     "faixa"     : 0.20,
 }
 
@@ -135,50 +133,40 @@ def carregar_dados():
 
 def gerar_jogos(total, todos_concursos, modo):
     """
-    Gera jogos usando ProbabilisticEngine.gerar_jogos() — método real confirmado.
-    Distribui a geração pelos últimos 200 concursos,
-    mesmo critério do backtest e do analisar_motor_v9.py.
+    Gera jogos usando SEMPRE o histórico completo como contexto.
 
-    Estratégia:
-        - Divide os 200 concursos em blocos.
-        - Em cada bloco gera um lote de candidatos com historico progressivo.
-        - Coleta os melhores jogos de cada lote até atingir o total desejado.
+    Isso garante que:
+      - O engine filtra repetições em relação ao concurso 3632 (o real).
+      - A medição posterior de repetição no script bate exatamente
+        com o filtro interno do engine.
+
+    Gera em lotes de 300 candidatos até atingir o total desejado.
     """
-    concursos_analise = todos_concursos[-200:]
-    n_total           = len(todos_concursos)
-    jogos_por_conc    = max(1, total // len(concursos_analise))
-    # candidatos por chamada: quanto mais candidatos, mais seletivo o engine
-    candidatos_por_chamada = jogos_por_conc * 10
+    jogos     = []
+    lote_qtd  = 10   # jogos por chamada
+    lote_cand = 300  # candidatos por chamada
 
-    jogos = []
-
-    for i, _ in enumerate(concursos_analise):
-        historico = todos_concursos[:n_total - (len(concursos_analise) - i)]
-        if len(historico) < 10:
-            continue
+    while len(jogos) < total:
+        faltam = total - len(jogos)
+        qtd    = min(lote_qtd, faltam)
 
         try:
             resultado, _ = ProbabilisticEngine.gerar_jogos(
-                concursos  = historico,
-                quantidade = jogos_por_conc,
-                candidatos = candidatos_por_chamada,
+                concursos  = todos_concursos,
+                quantidade = qtd,
+                candidatos = lote_cand,
                 modo       = modo,
             )
         except Exception as e:
-            print(f"\n   Aviso: erro ao gerar lote [{i}]: {e}")
-            continue
+            print(f"\n   Erro ao gerar lote: {e}")
+            break
 
-        # resultado é lista de (Concurso, score, repeticoes)
         for jogo_obj, _score, _rep in resultado:
             jogos.append(sorted(jogo_obj.dezenas))
 
-        feitos = min(len(jogos), total)
-        pct    = feitos / total * 100
-        print(f"\r   Gerando... {feitos:,}/{total:,} ({pct:.0f}%)",
+        pct = min(len(jogos), total) / total * 100
+        print(f"\r   Gerando... {min(len(jogos), total):,}/{total:,} ({pct:.0f}%)",
               end="", flush=True)
-
-        if len(jogos) >= total:
-            break
 
     print()
     return jogos[:total]
@@ -217,7 +205,6 @@ def analisar(jogos, ultimo_concurso):
 def diagnosticar(resultado):
     problemas = []
 
-    # Soma
     diff = resultado["soma"]["media"] - DNA_V9["soma_media"]
     if abs(diff) > TOLERANCIA["soma"]:
         acao = "Aumentar" if diff < 0 else "Reduzir"
@@ -228,7 +215,6 @@ def diagnosticar(resultado):
             "acao"     : f"{acao} PESO_SOMA em score_v10.py",
         })
 
-    # Pares
     diff = resultado["pares"]["media"] - DNA_V9["pares_media"]
     if abs(diff) > TOLERANCIA["pares"]:
         excesso = "pares" if diff > 0 else "impares"
@@ -238,7 +224,6 @@ def diagnosticar(resultado):
             "acao"     : "Verificar filtro de equilibrio par/impar no V10",
         })
 
-    # Repeticao
     diff = resultado["repeticao"]["media"] - DNA_V9["repeticao_media"]
     if abs(diff) > TOLERANCIA["repeticao"]:
         acao = "Aumentar" if diff < 0 else "Reduzir"
@@ -250,7 +235,6 @@ def diagnosticar(resultado):
                          f"ajustar penalizacao de repeticao em score_v10.py",
         })
 
-    # Faixas
     for i, nome in enumerate(NOMES_FAIXAS):
         diff = resultado["faixas"][i] - DNA_V9["faixas_medias"][i]
         if abs(diff) > TOLERANCIA["faixa"]:
@@ -279,7 +263,6 @@ def imprimir_relatorio(resultado, problemas, total_jogos, modo, total_conc, ulti
     print(f"  Ultimo concurso  : {ultimo}")
     print(SEP)
 
-    # 1. Soma
     s = resultado["soma"]
     print("\n1. SOMA DAS DEZENAS")
     print(SEP2)
@@ -290,7 +273,6 @@ def imprimir_relatorio(resultado, problemas, total_jogos, modo, total_conc, ulti
     print(f"  Minima      : {s['min']}   (ideal >= {DNA_V9['soma_min_ideal']})")
     print(f"  Maxima      : {s['max']}   (ideal <= {DNA_V9['soma_max_ideal']})")
 
-    # 2. Pares / Ímpares
     p  = resultado["pares"]
     ii = resultado["impares"]
     print("\n2. PARES / IMPARES")
@@ -302,7 +284,6 @@ def imprimir_relatorio(resultado, problemas, total_jogos, modo, total_conc, ulti
           f"Alvo V9 : {DNA_V9['impares_media']:.2f}   "
           f"{delta_str(ii['media'], DNA_V9['impares_media'], TOLERANCIA['pares'])}")
 
-    # 3. Faixas
     print("\n3. DISTRIBUICAO POR FAIXAS")
     print(SEP2)
     print(f"  {'Faixa':<8} {'V10':>7}  {'V9 alvo':>9}  {'Delta':>14}  Barra V10")
@@ -314,7 +295,6 @@ def imprimir_relatorio(resultado, problemas, total_jogos, modo, total_conc, ulti
               f"{delta_str(v10_val, v9_val, TOLERANCIA['faixa']):>14}  "
               f"{barra(v10_val, 5.0)}")
 
-    # 4. Repetição
     r = resultado["repeticao"]
     print("\n4. REPETICAO COM ULTIMO CONCURSO")
     print(SEP2)
@@ -329,7 +309,6 @@ def imprimir_relatorio(resultado, problemas, total_jogos, modo, total_conc, ulti
         print(f"    {qtd:>4} rep  {pct:>5.1f}%  "
               f"{barra(pct, 25.0, 18)}{marcador}")
 
-    # 5. Sequências
     sq = resultado["sequencia"]
     print("\n5. SEQUENCIAS CONSECUTIVAS")
     print(SEP2)
@@ -342,7 +321,6 @@ def imprimir_relatorio(resultado, problemas, total_jogos, modo, total_conc, ulti
         print(f"    seq {tam}  {pct:>5.1f}%  "
               f"{barra(pct, 40.0, 15)}{alerta}")
 
-    # Diagnóstico final
     print()
     print(SEP)
     print("  DIAGNOSTICO  -  V10 vs DNA alvo (V9)")

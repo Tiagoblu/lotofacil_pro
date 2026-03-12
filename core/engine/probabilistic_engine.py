@@ -20,12 +20,9 @@ class ProbabilisticEngine:
         - Retorna os melhores jogos ordenados por score.
 
     Modos disponíveis:
-        - CONSERVADOR : max 9 repetições em relação ao último concurso
-        - BALANCEADO  : max 11 repetições
-        - AGRESSIVO   : max 13 repetições
-
-    O score interno (V10) já é adaptativo ao ciclo do histórico,
-    independentemente do modo escolhido pelo usuário.
+        - CONSERVADOR : max 7 repetições em relação ao último concurso
+        - BALANCEADO  : max 8 repetições  ← reduzido de 11 para forçar alvo 7-8
+        - AGRESSIVO   : max 9 repetições  ← reduzido de 13
     """
 
     @staticmethod
@@ -39,10 +36,10 @@ class ProbabilisticEngine:
         Gera jogos avaliados pelo score V10.
 
         Args:
-            concursos: Lista de concursos históricos (mais antigos primeiro).
+            concursos:  Lista de concursos históricos (mais antigos primeiro).
             quantidade: Quantos jogos finais retornar.
             candidatos: Quantos candidatos gerar antes do filtro por score.
-            modo: Modo estratégico ("CONSERVADOR", "BALANCEADO", "AGRESSIVO").
+            modo:       Modo estratégico ("CONSERVADOR", "BALANCEADO", "AGRESSIVO").
 
         Returns:
             Tupla com:
@@ -57,27 +54,28 @@ class ProbabilisticEngine:
         resultado_ciclo = detectar_ciclo(concursos)
 
         info_ciclo: Dict[str, Any] = {
-            "ciclo": resultado_ciclo.ciclo,
-            "indice_volatilidade": resultado_ciclo.indice_volatilidade,
-            "peso_recencia": resultado_ciclo.peso_recencia,
+            "ciclo"               : resultado_ciclo.ciclo,
+            "indice_volatilidade" : resultado_ciclo.indice_volatilidade,
+            "peso_recencia"       : resultado_ciclo.peso_recencia,
         }
 
         ultimo_concurso = concursos[-1]
-        dezenas_ultimo = set(ultimo_concurso.dezenas)
+        dezenas_ultimo  = set(ultimo_concurso.dezenas)
 
+        # max_repeticoes reduzido para forçar jogos no alvo 7-8
         configuracoes = {
-            "CONSERVADOR": {"max_repeticoes": 9},
-            "BALANCEADO":  {"max_repeticoes": 11},
-            "AGRESSIVO":   {"max_repeticoes": 13},
+            "CONSERVADOR": {"max_repeticoes": 7},
+            "BALANCEADO" : {"max_repeticoes": 8},
+            "AGRESSIVO"  : {"max_repeticoes": 9},
         }
 
-        config = configuracoes.get(modo.upper(), configuracoes["BALANCEADO"])
+        config         = configuracoes.get(modo.upper(), configuracoes["BALANCEADO"])
         max_repeticoes = config["max_repeticoes"]
 
         jogos_avaliados: List[Tuple[Concurso, float, int]] = []
 
         for _ in range(candidatos):
-            dezenas = sorted(random.sample(range(1, 26), 15))
+            dezenas    = sorted(random.sample(range(1, 26), 15))
             repeticoes = len(set(dezenas) & dezenas_ultimo)
 
             if repeticoes > max_repeticoes:
@@ -90,7 +88,7 @@ class ProbabilisticEngine:
             )
 
             resultado_v10 = calcular_score_v10(jogo, concursos)
-            score = resultado_v10.score_final
+            score         = resultado_v10.score_final
 
             jogos_avaliados.append((jogo, score, repeticoes))
 
