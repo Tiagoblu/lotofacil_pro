@@ -1,0 +1,13 @@
+Jogo A (V9):
+02 03 04 06 07 10 12 15 16 19 20 21 22 23 24
+
+Jogo B (V9):
+01 02 03 04 05 10 11 12 13 14 18 20 22 24 25
+
+Jogo C (V9):
+02 03 05 06 08 09 11 12 14 16 18 19 21 23 24
+
+Jogo D (V9):
+02 05 07 08 09 11 13 14 15 17 20 21 23 24 25
+
+Esses 4 jogos são os que a gente viu premiando com 11 pontos em 3605 e 3606 (e provavelmente em outros concursos das prints).
