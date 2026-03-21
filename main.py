@@ -1,5 +1,6 @@
 import requests
 import sqlite3
+import os
 from pathlib import Path
 from datetime import datetime
 
@@ -71,6 +72,34 @@ def contar_acertos(jogo_dezenas, dezenas_sorteadas) -> int:
     return len(set(jogo_dezenas) & set(dezenas_sorteadas))
 
 
+def carregar_jogos_v9(caminho: str = "jogos_v9_fixos.txt") -> list:
+    """
+    Carrega os jogos base do V9. Se o arquivo não existir, 
+    utiliza um fallback interno (Hardcoded) para evitar crash no produto comercial.
+    """
+    jogos = []
+    if os.path.exists(caminho):
+        try:
+            with open(caminho, 'r', encoding='utf-8') as f:
+                for linha in f:
+                    dezenas = [int(x) for x in linha.replace(',', ' ').split() if x.isdigit()]
+                    if len(dezenas) >= 15:
+                        # Pega as primeiras 15 dezenas caso haja sujeira na string
+                        jogos.append(dezenas[:15])
+        except Exception as e:
+            print(f"Aviso: Erro ao ler {caminho} ({e}). Usando fallback interno.")
+            
+    # Fallback de segurança para produto comercial
+    if not jogos:
+        jogos = [
+            [2, 3, 4, 6, 7, 10, 12, 15, 16, 19, 20, 21, 22, 23, 24],
+            [1, 2, 3, 4, 5, 10, 11, 12, 13, 14, 18, 20, 22, 24, 25],
+            [2, 3, 5, 6, 8, 9, 11, 12, 14, 16, 18, 19, 21, 23, 24],
+            [2, 5, 7, 8, 9, 11, 13, 14, 15, 17, 20, 21, 23, 24, 25]
+        ]
+    return jogos
+
+
 def salvar_historico_v10(
     ultimo_concurso_db,
     dezenas_sorteadas,
@@ -78,12 +107,7 @@ def salvar_historico_v10(
     caminho_arquivo: str = "historico_v10.txt",
 ):
     """
-    Salva em texto:
-    - data/hora da execução
-    - número do concurso conferido
-    - resultado do concurso
-    - cada jogo gerado (dezenas, score, repetições)
-    - acertos e dezenas acertadas
+    Salva em texto os resultados para conferência estatística.
     """
     linha_div = "-" * 80
     with open(caminho_arquivo, "a", encoding="utf-8") as f:
@@ -132,9 +156,6 @@ def main():
     concursos = ConcursoRepository.obter_todos()
     print(f"Total de concursos: {len(concursos)}\n")
 
-    # ------------------------------------------------------------------
-    # Geração dos jogos pelo Motor Probabilístico (V10)
-    # ------------------------------------------------------------------
     if not concursos:
         print("Nenhum concurso encontrado no banco para gerar jogos.")
         return
@@ -143,20 +164,28 @@ def main():
     print(f"Último concurso no banco: {ultimo_concurso_db.numero}")
     print(f"Gerando jogos para o próximo: {ultimo_concurso_db.numero + 1}\n")
 
-    print("Gerando candidatos com Motor Probabilístico...\n")
-    modo_estrategia = "BALANCEADO"
+    # PREPARAÇÃO PARA O MODO HÍBRIDO
+    print("Carregando base estrutural (Jogos V9)...")
+    jogos_v9 = carregar_jogos_v9()
+    
+    # Alteramos a variável de controle para o novo modo
+    modo_estrategia = "HIBRIDO_V9"
 
+    print("Gerando candidatos com Motor Probabilístico...\n")
+    
+    # Injetamos o parâmetro jogos_base (que precisaremos tratar na engine)
     jogos_motor, info_ciclo = ProbabilisticEngine.gerar_jogos(
         concursos,
         quantidade=5,
         candidatos=300,
         modo=modo_estrategia,
+        jogos_base=jogos_v9 # Parâmetro novo adicionado
     )
 
     print(f"Modo Estratégico Ativo : {modo_estrategia}")
-    print(f"Ciclo Detectado (V10)  : {info_ciclo['ciclo']}")
-    print(f"Índice de Volatilidade : {info_ciclo['indice_volatilidade']:.4f}")
-    print(f"Peso Recência          : {info_ciclo['peso_recencia']:.2f}\n")
+    print(f"Ciclo Detectado (V10)  : {info_ciclo.get('ciclo', 'N/A')}")
+    print(f"Índice de Volatilidade : {info_ciclo.get('indice_volatilidade', 0.0):.4f}")
+    print(f"Peso Recência          : {info_ciclo.get('peso_recencia', 0.0):.2f}\n")
     print("Jogos Finais:\n")
 
     for i, (jogo, score, repeticoes) in enumerate(jogos_motor, start=1):
@@ -190,7 +219,6 @@ def main():
                 f"  Dezenas acertadas: {' '.join(f'{d:02d}' for d in dezenas_acertadas)}\n"
             )
 
-        # Salva tudo no arquivo de histórico
         salvar_historico_v10(
             ultimo_concurso_db=ultimo_concurso_db,
             dezenas_sorteadas=dezenas_sorteadas,
