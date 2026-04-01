@@ -19,8 +19,8 @@ class ProbabilisticEngine:
 
     Modos disponíveis:
         - CONSERVADOR : max 7 repetições em relação ao último concurso
-        - BALANCEADO  : max 8 repetições  ← reduzido de 11 para forçar alvo 7-8
-        - AGRESSIVO   : max 9 repetições  ← reduzido de 13
+        - BALANCEADO  : max 8 repetições
+        - AGRESSIVO   : max 9 repetições
         - HIBRIDO_V9  : max 9 repetições  ← Mescla núcleo forte do V9 com completude do V10
     """
 
@@ -30,7 +30,8 @@ class ProbabilisticEngine:
         quantidade: int = 5,
         candidatos: int = 300,
         modo: str = "BALANCEADO",
-        jogos_base: Optional[List[List[int]]] = None
+        jogos_base: Optional[List[List[int]]] = None,
+        tamanho_nucleo_v9: int = 7  # Parâmetro ajustado para dar mais liberdade ao V10
     ) -> Tuple[List[Tuple[Concurso, float, int]], Dict[str, Any]]:
         """
         Gera jogos avaliados pelo score V10.
@@ -41,12 +42,7 @@ class ProbabilisticEngine:
             candidatos: Quantos candidatos gerar antes do filtro por score.
             modo:       Modo estratégico ("CONSERVADOR", "BALANCEADO", "AGRESSIVO", "HIBRIDO_V9").
             jogos_base: Lista de jogos V9 fixos para servir de núcleo no modo HIBRIDO_V9.
-
-        Returns:
-            Tupla com:
-                - Lista de (jogo, score, repeticoes) ordenada por score desc.
-                - Dicionário com informações do ciclo detectado pelo V10:
-                  {ciclo, indice_volatilidade, peso_recencia}
+            tamanho_nucleo_v9: Quantidade de dezenas extraídas do V9 (default 7).
         """
         if not concursos:
             raise ValueError("Lista de concursos não pode ser vazia.")
@@ -67,7 +63,7 @@ class ProbabilisticEngine:
             "CONSERVADOR": {"max_repeticoes": 7},
             "BALANCEADO" : {"max_repeticoes": 8},
             "AGRESSIVO"  : {"max_repeticoes": 9},
-            "HIBRIDO_V9" : {"max_repeticoes": 9}, # Um pouco mais de flexibilidade no núcleo
+            "HIBRIDO_V9" : {"max_repeticoes": 9},
         }
 
         modo_upper = modo.upper()
@@ -76,11 +72,8 @@ class ProbabilisticEngine:
 
         jogos_avaliados: List[Tuple[Concurso, float, int]] = []
         
-        # Validação de segurança para o produto
         usar_hibrido = (modo_upper == "HIBRIDO_V9" and jogos_base is not None and len(jogos_base) > 0)
 
-        # Usamos um controle de tentativas para garantir que vamos avaliar exatamente a
-        # quantidade de 'candidatos' válidos, evitando que o filtro max_repeticoes empobreça a amostragem
         tentativas_maximas = candidatos * 4 
         tentativas = 0
 
@@ -90,21 +83,21 @@ class ProbabilisticEngine:
             if usar_hibrido:
                 # 1. Escolhe um dos jogos base do V9
                 jogo_molde = random.choice(jogos_base)
-                # 2. Extrai um núcleo forte de 10 dezenas
-                nucleo = set(random.sample(jogo_molde, 10))
-                # 3. Descobre quais dezenas sobraram no volante (1 a 25)
+                # 2. Extrai um núcleo dinâmico (agora 7 dezenas, evitando engessamento)
+                nucleo = set(random.sample(jogo_molde, tamanho_nucleo_v9))
+                # 3. Descobre quais dezenas sobraram no volante
                 dezenas_disponiveis = list(set(range(1, 26)) - nucleo)
-                # 4. Preenche as 5 vagas restantes aleatoriamente
-                complemento = random.sample(dezenas_disponiveis, 5)
+                # 4. Preenche as vagas restantes aleatoriamente para o V10 avaliar
+                vagas_restantes = 15 - tamanho_nucleo_v9
+                complemento = random.sample(dezenas_disponiveis, vagas_restantes)
                 # 5. Une e ordena
                 dezenas = sorted(list(nucleo) + complemento)
             else:
-                # Geração V10 Clássica (Totalmente Aleatória)
+                # Geração V10 Clássica
                 dezenas = sorted(random.sample(range(1, 26), 15))
 
             repeticoes = len(set(dezenas) & dezenas_ultimo)
 
-            # Filtra estruturas que repetem demais o último concurso
             if repeticoes > max_repeticoes:
                 continue
 
@@ -114,13 +107,11 @@ class ProbabilisticEngine:
                 dezenas=tuple(dezenas)
             )
 
-            # Passa o candidato pelo crivo probabilístico
             resultado_v10 = calcular_score_v10(jogo, concursos)
             score         = resultado_v10.score_final
 
             jogos_avaliados.append((jogo, score, repeticoes))
 
-        # Ordena os aprovados do maior para o menor Score V10
         jogos_ordenados = sorted(
             jogos_avaliados,
             key=lambda x: x[1],
