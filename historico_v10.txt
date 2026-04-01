@@ -558,3 +558,38 @@ Jogo 5: 03 04 05 06 07 12 13 15 18 19 20 22 23 24 25
   Acertos               : 8
   Dezenas acertadas      : 05 06 07 12 13 20 22 25
 
+--------------------------------------------------------------------------------
+Execução em: 01/04/2026 14:49:30
+Concurso conferido: 3650
+Resultado: 02 05 06 07 08 10 11 12 13 16 17 20 21 22 25
+
+Jogo 1: 01 04 06 07 10 13 14 15 18 19 20 22 23 24 25
+  Score V10             : 1.218656
+  Repetições Anteriores : 7
+  Acertos               : 7
+  Dezenas acertadas      : 06 07 10 13 20 22 25
+
+Jogo 2: 01 03 07 08 10 11 15 16 17 18 19 22 23 24 25
+  Score V10             : 1.209570
+  Repetições Anteriores : 8
+  Acertos               : 8
+  Dezenas acertadas      : 07 08 10 11 16 17 22 25
+
+Jogo 3: 01 03 08 09 11 13 14 16 17 18 20 21 23 24 25
+  Score V10             : 1.209432
+  Repetições Anteriores : 8
+  Acertos               : 8
+  Dezenas acertadas      : 08 11 13 16 17 20 21 25
+
+Jogo 4: 02 03 06 09 12 13 15 16 18 19 20 21 23 24 25
+  Score V10             : 1.204391
+  Repetições Anteriores : 8
+  Acertos               : 8
+  Dezenas acertadas      : 02 06 12 13 16 20 21 25
+
+Jogo 5: 01 02 03 09 11 12 15 16 18 19 20 21 22 24 25
+  Score V10             : 1.163447
+  Repetições Anteriores : 8
+  Acertos               : 8
+  Dezenas acertadas      : 02 11 12 16 20 21 22 25
+
