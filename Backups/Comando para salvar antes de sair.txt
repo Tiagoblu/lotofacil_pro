@@ -4,5 +4,5 @@ git push
 
 
 git add .
-git commit -m "chore: inicio da fase de coleta de dados em producao (concursos 3643 a 3660)"
+git commit -m "chore: inicio da fase de coleta de dados em produção (concursos 3643 a 3660)"
 git push
