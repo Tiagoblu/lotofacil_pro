@@ -8,21 +8,28 @@ from core.statistics.score_v10 import detectar_ciclo
 
 class ProbabilisticEngine:
     """
-    Motor probabilístico de geração de jogos.
-
-    Fluxo:
-        - Detecta o ciclo atual do histórico via score_v10.detectar_ciclo().
-        - Gera candidatos aleatórios ou híbridos com 15 dezenas.
-        - Filtra candidatos pelo limite de repetições do modo escolhido.
-        - Calcula o score V10 para cada candidato válido.
-        - Retorna os melhores jogos ordenados por score.
-
-    Modos disponíveis:
-        - CONSERVADOR : max 7 repetições em relação ao último concurso
-        - BALANCEADO  : max 8 repetições
-        - AGRESSIVO   : max 9 repetições
-        - HIBRIDO_V9  : max 9 repetições  ← Mescla núcleo forte do V9 com completude do V10
+    Motor probabilístico V10 - Versão Comercial 1.1
+    Inclui: Modo Híbrido V9 + Filtro de Fechamento de Ciclo. [cite: 8, 113, 197]
     """
+
+    @staticmethod
+    def identificar_dezenas_faltantes(concursos: List[Concurso]) -> List[int]:
+        """Identifica quais dezenas ainda não saíram no ciclo atual."""
+        todas_dezenas = set(range(1, 26))
+        dezenas_sorteadas_no_ciclo = set()
+        
+        # Percorre do mais recente para o mais antigo para encontrar o início do ciclo
+        for c in reversed(concursos):
+            dezenas_sorteadas_no_ciclo.update(c.dezenas)
+            if len(dezenas_sorteadas_no_ciclo) == 25:
+                # O ciclo anterior fechou aqui. O ciclo atual começou no concurso seguinte.
+                # Precisamos resetar e pegar apenas o que saiu DEPOIS desse fechamento.
+                dezenas_sorteadas_no_ciclo = set()
+                continue
+        
+        # Após o loop, o que sobrar em dezenas_sorteadas_no_ciclo é o progresso do ciclo ATUAL
+        faltantes = list(todas_dezenas - dezenas_sorteadas_no_ciclo)
+        return sorted(faltantes)
 
     @staticmethod
     def gerar_jogos(
@@ -31,91 +38,74 @@ class ProbabilisticEngine:
         candidatos: int = 300,
         modo: str = "BALANCEADO",
         jogos_base: Optional[List[List[int]]] = None,
-        tamanho_nucleo_v9: int = 7  # Parâmetro ajustado para dar mais liberdade ao V10
+        tamanho_nucleo_v9: int = 7
     ) -> Tuple[List[Tuple[Concurso, float, int]], Dict[str, Any]]:
         """
-        Gera jogos avaliados pelo score V10.
-
-        Args:
-            concursos:  Lista de concursos históricos (mais antigos primeiro).
-            quantidade: Quantos jogos finais retornar.
-            candidatos: Quantos candidatos gerar antes do filtro por score.
-            modo:       Modo estratégico ("CONSERVADOR", "BALANCEADO", "AGRESSIVO", "HIBRIDO_V9").
-            jogos_base: Lista de jogos V9 fixos para servir de núcleo no modo HIBRIDO_V9.
-            tamanho_nucleo_v9: Quantidade de dezenas extraídas do V9 (default 7).
+        Gera jogos usando o Motor V10 com priorização de fechamento de ciclo. [cite: 23, 121]
         """
         if not concursos:
             raise ValueError("Lista de concursos não pode ser vazia.")
 
-        # Detecta o ciclo uma única vez para todo o lote
         resultado_ciclo = detectar_ciclo(concursos)
+        faltantes_ciclo = ProbabilisticEngine.identificar_dezenas_faltantes(concursos)
 
         info_ciclo: Dict[str, Any] = {
-            "ciclo"               : resultado_ciclo.ciclo,
-            "indice_volatilidade" : resultado_ciclo.indice_volatilidade,
-            "peso_recencia"       : resultado_ciclo.peso_recencia,
+            "ciclo": resultado_ciclo.ciclo,
+            "indice_volatilidade": resultado_ciclo.indice_volatilidade,
+            "peso_recencia": resultado_ciclo.peso_recencia,
+            "dezenas_faltantes": faltantes_ciclo
         }
 
         ultimo_concurso = concursos[-1]
-        dezenas_ultimo  = set(ultimo_concurso.dezenas)
+        dezenas_ultimo = set(ultimo_concurso.dezenas)
 
         configuracoes = {
             "CONSERVADOR": {"max_repeticoes": 7},
-            "BALANCEADO" : {"max_repeticoes": 8},
-            "AGRESSIVO"  : {"max_repeticoes": 9},
-            "HIBRIDO_V9" : {"max_repeticoes": 9},
+            "BALANCEADO": {"max_repeticoes": 8},
+            "AGRESSIVO": {"max_repeticoes": 9},
+            "HIBRIDO_V9": {"max_repeticoes": 9},
         }
 
         modo_upper = modo.upper()
-        config         = configuracoes.get(modo_upper, configuracoes["BALANCEADO"])
+        config = configuracoes.get(modo_upper, configuracoes["BALANCEADO"])
         max_repeticoes = config["max_repeticoes"]
 
         jogos_avaliados: List[Tuple[Concurso, float, int]] = []
-        
         usar_hibrido = (modo_upper == "HIBRIDO_V9" and jogos_base is not None and len(jogos_base) > 0)
 
-        tentativas_maximas = candidatos * 4 
+        tentativas_maximas = candidatos * 10
         tentativas = 0
 
         while len(jogos_avaliados) < candidatos and tentativas < tentativas_maximas:
             tentativas += 1
             
             if usar_hibrido:
-                # 1. Escolhe um dos jogos base do V9
                 jogo_molde = random.choice(jogos_base)
-                # 2. Extrai um núcleo dinâmico (agora 7 dezenas, evitando engessamento)
                 nucleo = set(random.sample(jogo_molde, tamanho_nucleo_v9))
-                # 3. Descobre quais dezenas sobraram no volante
-                dezenas_disponiveis = list(set(range(1, 26)) - nucleo)
-                # 4. Preenche as vagas restantes aleatoriamente para o V10 avaliar
                 vagas_restantes = 15 - tamanho_nucleo_v9
-                complemento = random.sample(dezenas_disponiveis, vagas_restantes)
-                # 5. Une e ordena
-                dezenas = sorted(list(nucleo) + complemento)
+                
+                # --- NOVO FILTRO DE CICLO ---
+                # Tentamos colocar 2 dezenas faltantes do ciclo se elas não estiverem no núcleo
+                faltantes_disponiveis = [d for d in faltantes_ciclo if d not in nucleo]
+                dezenas_ciclo = []
+                if len(faltantes_disponiveis) >= 2:
+                    dezenas_ciclo = random.sample(faltantes_disponiveis, 2)
+                
+                complemento_aleatorio = vagas_restantes - len(dezenas_ciclo)
+                dezenas_restantes = list(set(range(1, 26)) - nucleo - set(dezenas_ciclo))
+                complemento = random.sample(dezenas_restantes, complemento_aleatorio)
+                
+                dezenas = sorted(list(nucleo) + dezenas_ciclo + complemento)
             else:
-                # Geração V10 Clássica
                 dezenas = sorted(random.sample(range(1, 26), 15))
 
             repeticoes = len(set(dezenas) & dezenas_ultimo)
-
             if repeticoes > max_repeticoes:
                 continue
 
-            jogo = Concurso(
-                numero=0,
-                data="",
-                dezenas=tuple(dezenas)
-            )
-
+            jogo = Concurso(numero=0, data="", dezenas=tuple(dezenas))
             resultado_v10 = calcular_score_v10(jogo, concursos)
-            score         = resultado_v10.score_final
+            jogos_avaliados.append((jogo, resultado_v10.score_final, repeticoes))
 
-            jogos_avaliados.append((jogo, score, repeticoes))
-
-        jogos_ordenados = sorted(
-            jogos_avaliados,
-            key=lambda x: x[1],
-            reverse=True
-        )
-
+        jogos_ordenados = sorted(jogos_avaliados, key=lambda x: x[1], reverse=True)
         return jogos_ordenados[:quantidade], info_ciclo
