@@ -8,27 +8,23 @@ from core.statistics.score_v10 import detectar_ciclo
 
 class ProbabilisticEngine:
     """
-    Motor probabilístico V10 - Versão Comercial 1.1
-    Inclui: Modo Híbrido V9 + Filtro de Fechamento de Ciclo. [cite: 8, 113, 197]
+    Motor probabilístico V10 - Versão Comercial 1.2 (Otimizada)
+    Melhoria: Lógica de Ciclo Progressiva e Inclusão Obrigatória de Reta Final.
     """
 
     @staticmethod
     def identificar_dezenas_faltantes(concursos: List[Concurso]) -> List[int]:
-        """Identifica quais dezenas ainda não saíram no ciclo atual."""
+        """Identifica quais dezenas ainda não saíram no ciclo atual usando lógica progressiva."""
         todas_dezenas = set(range(1, 26))
-        dezenas_sorteadas_no_ciclo = set()
+        sorteadas_no_ciclo = set()
         
-        # Percorre do mais recente para o mais antigo para encontrar o início do ciclo
-        for c in reversed(concursos):
-            dezenas_sorteadas_no_ciclo.update(c.dezenas)
-            if len(dezenas_sorteadas_no_ciclo) == 25:
-                # O ciclo anterior fechou aqui. O ciclo atual começou no concurso seguinte.
-                # Precisamos resetar e pegar apenas o que saiu DEPOIS desse fechamento.
-                dezenas_sorteadas_no_ciclo = set()
-                continue
+        # Processamento progressivo para garantir precisão no fecho
+        for c in concursos:
+            sorteadas_no_ciclo.update(c.dezenas)
+            if len(sorteadas_no_ciclo) == 25:
+                sorteadas_no_ciclo = set()
         
-        # Após o loop, o que sobrar em dezenas_sorteadas_no_ciclo é o progresso do ciclo ATUAL
-        faltantes = list(todas_dezenas - dezenas_sorteadas_no_ciclo)
+        faltantes = list(todas_dezenas - sorteadas_no_ciclo)
         return sorted(faltantes)
 
     @staticmethod
@@ -40,9 +36,7 @@ class ProbabilisticEngine:
         jogos_base: Optional[List[List[int]]] = None,
         tamanho_nucleo_v9: int = 7
     ) -> Tuple[List[Tuple[Concurso, float, int]], Dict[str, Any]]:
-        """
-        Gera jogos usando o Motor V10 com priorização de fechamento de ciclo. [cite: 23, 121]
-        """
+        
         if not concursos:
             raise ValueError("Lista de concursos não pode ser vazia.")
 
@@ -58,22 +52,12 @@ class ProbabilisticEngine:
 
         ultimo_concurso = concursos[-1]
         dezenas_ultimo = set(ultimo_concurso.dezenas)
-
-        configuracoes = {
-            "CONSERVADOR": {"max_repeticoes": 7},
-            "BALANCEADO": {"max_repeticoes": 8},
-            "AGRESSIVO": {"max_repeticoes": 9},
-            "HIBRIDO_V9": {"max_repeticoes": 9},
-        }
-
-        modo_upper = modo.upper()
-        config = configuracoes.get(modo_upper, configuracoes["BALANCEADO"])
-        max_repeticoes = config["max_repeticoes"]
+        max_repeticoes = 9 if modo.upper() == "HIBRIDO_V9" else 8
 
         jogos_avaliados: List[Tuple[Concurso, float, int]] = []
-        usar_hibrido = (modo_upper == "HIBRIDO_V9" and jogos_base is not None and len(jogos_base) > 0)
+        usar_hibrido = (modo.upper() == "HIBRIDO_V9" and jogos_base is not None)
 
-        tentativas_maximas = candidatos * 10
+        tentativas_maximas = candidatos * 15
         tentativas = 0
 
         while len(jogos_avaliados) < candidatos and tentativas < tentativas_maximas:
@@ -81,21 +65,28 @@ class ProbabilisticEngine:
             
             if usar_hibrido:
                 jogo_molde = random.choice(jogos_base)
+                # Seleciona núcleo do V9
                 nucleo = set(random.sample(jogo_molde, tamanho_nucleo_v9))
-                vagas_restantes = 15 - tamanho_nucleo_v9
                 
-                # --- NOVO FILTRO DE CICLO ---
-                # Tentamos colocar 2 dezenas faltantes do ciclo se elas não estiverem no núcleo
-                faltantes_disponiveis = [d for d in faltantes_ciclo if d not in nucleo]
-                dezenas_ciclo = []
-                if len(faltantes_disponiveis) >= 2:
-                    dezenas_ciclo = random.sample(faltantes_disponiveis, 2)
+                # --- LÓGICA DE CICLO V1.2 (OBRIGATÓRIA) ---
+                # Se restarem 3 ou menos, inclui todas. Se mais, sorteia 2.
+                if len(faltantes_ciclo) <= 3 and len(faltantes_ciclo) > 0:
+                    dezenas_ciclo = set(faltantes_ciclo)
+                else:
+                    faltantes_disponiveis = [d for d in faltantes_ciclo if d not in nucleo]
+                    dezenas_ciclo = set(random.sample(faltantes_disponiveis, min(len(faltantes_disponiveis), 2)))
                 
-                complemento_aleatorio = vagas_restantes - len(dezenas_ciclo)
-                dezenas_restantes = list(set(range(1, 26)) - nucleo - set(dezenas_ciclo))
-                complemento = random.sample(dezenas_restantes, complemento_aleatorio)
+                # Montagem do jogo garantindo que não ultrapasse 15 dezenas
+                dezenas_atuais = nucleo | dezenas_ciclo
+                vagas_abertas = 15 - len(dezenas_atuais)
                 
-                dezenas = sorted(list(nucleo) + dezenas_ciclo + complemento)
+                if vagas_abertas < 0: # Caso o núcleo + ciclo passem de 15
+                    dezenas_list = list(dezenas_atuais)
+                    dezenas = sorted(random.sample(dezenas_list, 15))
+                else:
+                    possiveis = list(set(range(1, 26)) - dezenas_atuais)
+                    complemento = random.sample(possiveis, vagas_abertas)
+                    dezenas = sorted(list(dezenas_atuais) + complemento)
             else:
                 dezenas = sorted(random.sample(range(1, 26), 15))
 
