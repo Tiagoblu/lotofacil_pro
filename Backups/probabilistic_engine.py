@@ -1,5 +1,4 @@
 import random
-import os
 from typing import Dict, List, Tuple, Any, Optional
 
 from core.domain.models import Concurso
@@ -66,18 +65,22 @@ class ProbabilisticEngine:
             
             if usar_hibrido:
                 jogo_molde = random.choice(jogos_base)
+                # Seleciona núcleo do V9
                 nucleo = set(random.sample(jogo_molde, tamanho_nucleo_v9))
                 
+                # --- LÓGICA DE CICLO V1.2 (OBRIGATÓRIA) ---
+                # Se restarem 3 ou menos, inclui todas. Se mais, sorteia 2.
                 if len(faltantes_ciclo) <= 3 and len(faltantes_ciclo) > 0:
                     dezenas_ciclo = set(faltantes_ciclo)
                 else:
                     faltantes_disponiveis = [d for d in faltantes_ciclo if d not in nucleo]
                     dezenas_ciclo = set(random.sample(faltantes_disponiveis, min(len(faltantes_disponiveis), 2)))
                 
+                # Montagem do jogo garantindo que não ultrapasse 15 dezenas
                 dezenas_atuais = nucleo | dezenas_ciclo
                 vagas_abertas = 15 - len(dezenas_atuais)
                 
-                if vagas_abertas < 0:
+                if vagas_abertas < 0: # Caso o núcleo + ciclo passem de 15
                     dezenas_list = list(dezenas_atuais)
                     dezenas = sorted(random.sample(dezenas_list, 15))
                 else:
@@ -97,17 +100,3 @@ class ProbabilisticEngine:
 
         jogos_ordenados = sorted(jogos_avaliados, key=lambda x: x[1], reverse=True)
         return jogos_ordenados[:quantidade], info_ciclo
-
-    @staticmethod
-    def salvar_historico_v10(jogos_avaliados: List[Tuple[Concurso, float, int]], alvo: int, arquivo: str = "historico_v10.txt"):
-        """Salva os jogos gerados no arquivo de histórico com o concurso alvo."""
-        try:
-            file_exists = os.path.isfile(arquivo)
-            with open(arquivo, "a", encoding="utf-8") as f:
-                if not file_exists:
-                    f.write("CONCURSO_ALVO | DEZENAS | SCORE_V10\n")
-                for jogo_obj, score, _ in jogos_avaliados:
-                    dezenas_str = " ".join(f"{d:02d}" for d in sorted(jogo_obj.dezenas))
-                    f.write(f"{alvo} | {dezenas_str} | {score:.6f}\n")
-        except Exception as e:
-            print(f"[ERRO AO SALVAR HISTÓRICO]: {e}")
