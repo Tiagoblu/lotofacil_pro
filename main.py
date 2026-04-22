@@ -1,85 +1,105 @@
 import os
 import sys
-from core.engine.probabilistic_engine import ProbabilisticEngine
-from core.database.db_manager import DBManager
-from core.utils.scanner import ScannerIntegridade # Assumindo a estrutura do seu scanner
 
-# ============================================================
-# CONFIGURAÇÕES DA VERSÃO V11
-# ============================================================
-VERSAO = "V11 – Inteligência de Decisão"
-VOLATILIDADE_ATUAL = 0.0035
-PESO_RECENCIA = 0.25
+# 1. Ajuste de Path Absoluto para o ambiente do projeto
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+if BASE_DIR not in sys.path:
+    sys.path.insert(0, BASE_DIR)
 
-def gerar_conselho_v11(faltantes, score_jogo_1):
-    """
-    Analisa matematicamente a janela de oportunidade baseada no 
-    estado do ciclo e na força do Score V10.
-    """
-    num_faltantes = len(faltantes)
-    
-    if num_faltantes <= 3 and score_jogo_1 >= 1.20:
-        nivel = "🔥 MÁXIMA (JANELA DE OURO)"
-        conselho = "O ciclo está para fechar e o Score V10 está altíssimo. Momento ideal para buscar premiações superiores."
-    elif num_faltantes <= 5:
-        nivel = "✅ ALTA"
-        conselho = "Fase final de ciclo. As dezenas faltantes têm altíssima probabilidade de sorteio conjunto."
-    elif num_faltantes > 20:
-        nivel = "⚖️ MODERADA (INÍCIO DE CICLO)"
-        conselho = "Início de novo ciclo. O motor está calibrando as novas tendências. Mantenha apostas base."
-    else:
-        nivel = "⚠️ ESTÁVEL"
-        conselho = "Meio de ciclo. O sistema busca o equilíbrio entre dezenas repetidas e atrasadas."
+try:
+    from core.infrastructure.database.database import get_connection
+    from core.engine.probabilistic_engine import ProbabilisticEngine
+    from core.domain.models import Concurso
+except ImportError as e:
+    print(f"\n[ERRO DE ESTRUTURA]: {e}")
+    sys.exit(1)
 
-    return nivel, conselho
+def preparar_concursos():
+    """Busca dados no DB e converte para a lista de objetos Concurso exigida pelo motor."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        # Busca: numero(0), data(1), d1(2)...d15(16)
+        cursor.execute("SELECT * FROM concursos ORDER BY numero ASC")
+        rows = cursor.fetchall()
+        
+        concursos_obj = []
+        for r in rows:
+            # Converte a fatia d1-d15 (índices 2 a 16) para a tupla do modelo
+            obj = Concurso(
+                numero=r[0],
+                data=r[1],
+                dezenas=tuple(r[2:17])
+            )
+            concursos_obj.append(obj)
+        return concursos_obj
+    except Exception as e:
+        print(f"[ERRO NO BANCO]: {e}")
+        return []
+    finally:
+        conn.close()
 
 def main():
-    print("="*60)
-    print(f"==== LotoFácil Pro {VERSAO} ====")
-    print("="*60)
+    print("="*65)
+    print("       LOTOFÁCIL PRO V11 – Inteligência de Decisão")
+    print("="*65)
 
-    # 1. Sincronização e Integridade
-    db = DBManager()
-    scanner = ScannerIntegridade(db)
-    scanner.executar_sincronizacao_total() # Garante histórico 100% linear
+    try:
+        # 1. Prepara os dados no formato que o motor espera (List[Concurso])
+        lista_concursos = preparar_concursos()
+        if not lista_concursos:
+            print("[ERRO]: Falha ao carregar dados do banco.")
+            return
 
-    # 2. Inicialização do Motor
-    engine = ProbabilisticEngine(db)
-    
-    # 3. Coleta de Dados do Ciclo
-    ultimo_concurso = db.get_ultimo_concurso_id()
-    faltantes = engine.get_dezenas_faltantes_ciclo()
-    
-    # 4. Geração de Jogos
-    # Usando o modo HIBRIDO_V9 conforme definido na arquitetura
-    jogos_sugeridos = engine.gerar_jogos(
-        quantidade=5, 
-        modo="HIBRIDO_V9", 
-        volatilidade=VOLATILIDADE_ATUAL,
-        peso_recencia=PESO_RECENCIA
-    )
+        ultimo_concurso = lista_concursos[-1]
+        alvo = ultimo_concurso.numero + 1
 
-    # 5. Cálculo do Conselho V11
-    score_lider = jogos_sugeridos[0]['score']
-    nivel_op, texto_conselho = gerar_conselho_v11(faltantes, score_lider)
+        # 2. Inicializa o motor e processa a geração
+        engine = ProbabilisticEngine()
+        
+        # O retorno do motor é: (lista_de_jogos_avaliados, info_ciclo)
+        # Onde cada item em lista_de_jogos_avaliados é (Concurso, score, repeticoes)
+        jogos_brutos, info_ciclo = engine.gerar_jogos(
+            concursos=lista_concursos, 
+            quantidade=5, 
+            modo="HIBRIDO_V9"
+        )
 
-    # 6. Dashboard de Saída
-    print(f"\nÚltimo no banco: {ultimo_concurso} | Status do Ciclo: {engine.get_status_ciclo()}")
-    print(f"Faltantes ({len(faltantes)}): {' '.join(map(str, sorted(faltantes)))}")
-    
-    print("-" * 60)
-    print(f"INDICADOR DE OPORTUNIDADE: {nivel_op}")
-    print(f"CONSELHO ESTRATÉGICO: {texto_conselho}")
-    print("-" * 60)
+        # 3. Inteligência 'Janela de Ouro'
+        faltantes = info_ciclo.get('dezenas_faltantes', [])
+        score_lider = jogos_brutos[0][1] # Pega o score do primeiro jogo da lista
+        
+        if 0 < len(faltantes) <= 4 and score_lider >= 1.18:
+            status = "🔥 JANELA DE OURO"
+            conselho = f"Momento de máxima probabilidade para o concurso {alvo}."
+        elif len(faltantes) <= 6:
+            status = "✅ OPORTUNIDADE ALTA"
+            conselho = "Fechamento de ciclo iminente detectado."
+        else:
+            status = "⚖️ ESTÁVEL"
+            conselho = "Análise estatística de rotina."
 
-    print("\nJOGOS PARA O PRÓXIMO CONCURSO:")
-    for i, jogo in enumerate(jogos_sugeridos, 1):
-        dezenas_str = " ".join(f"{d:02d}" for d in sorted(jogo['dezenas']))
-        print(f"Jogo {i}: {dezenas_str} | Score: {jogo['score']:.6f}")
+        # 4. Dashboard de Saída
+        print(f"STATUS DA ESTRATÉGIA : {status}")
+        print(f"CONSELHO DO SISTEMA  : {conselho}")
+        print("-" * 65)
+        print(f"Último Registrado: {ultimo_concurso.numero}  |  Alvo: {alvo}")
+        print(f"Faltantes no Ciclo: {' '.join(map(str, faltantes))}")
+        print("-" * 65)
 
-    # 7. Salvamento de Log
-    engine.salvar_historico_v10(jogos_sugeridos, arquivo="historico_v10.txt")
-    print("\n[OK] Histórico atualizado e jogos salvos.")
+        print(f"\nJOGOS SUGERIDOS PARA O CONCURSO {alvo}:")
+        
+        # Descompacta a tupla (ObjetoConcurso, Score, Repeticoes)
+        for i, (jogo_obj, score, rep) in enumerate(jogos_brutos, 1):
+            dezenas_fmt = " ".join(f"{d:02d}" for d in sorted(jogo_obj.dezenas))
+            print(f"Jogo {i}: {dezenas_fmt} | Score V10: {score:.6f}")
+
+        # 5. Salva histórico (O motor espera a lista de tuplas avaliadas)
+        engine.salvar_historico_v10(jogos_brutos, arquivo="historico_v10.txt")
+        print("\n[OK] Processamento concluído com sucesso.")
+
+    except Exception as e:
+        print(f"\n[ERRO NA EXECUÇÃO]: {e}")
 
 if __name__ == "__main__":
     main()
