@@ -1,113 +1,99 @@
 import random
-import os
-from typing import Dict, List, Tuple, Any, Optional
+import datetime
+from typing import List, Tuple, Dict, Any
 
 from core.domain.models import Concurso
 from core.statistics.score_v10 import calcular as calcular_score_v10
-from core.statistics.score_v10 import detectar_ciclo
-
 
 class ProbabilisticEngine:
     """
-    Motor probabilístico V10 - Versão Comercial 1.2 (Otimizada)
-    Melhoria: Lógica de Ciclo Progressiva e Inclusão Obrigatória de Reta Final.
+    Motor Probabilístico V11 - High-Speed Elite Search
+    Objetivo: Restaurar Scores 1.20+ com processamento instantâneo.
     """
 
     @staticmethod
     def identificar_dezenas_faltantes(concursos: List[Concurso]) -> List[int]:
-        """Identifica quais dezenas ainda não saíram no ciclo atual usando lógica progressiva."""
         todas_dezenas = set(range(1, 26))
         sorteadas_no_ciclo = set()
-        
-        # Processamento progressivo para garantir precisão no fecho
         for c in concursos:
             sorteadas_no_ciclo.update(c.dezenas)
             if len(sorteadas_no_ciclo) == 25:
                 sorteadas_no_ciclo = set()
-        
-        faltantes = list(todas_dezenas - sorteadas_no_ciclo)
-        return sorted(faltantes)
+        return sorted(list(todas_dezenas - sorteadas_no_ciclo))
 
-    @staticmethod
-    def gerar_jogos(
-        concursos: List[Concurso],
-        quantidade: int = 5,
-        candidatos: int = 300,
-        modo: str = "BALANCEADO",
-        jogos_base: Optional[List[List[int]]] = None,
-        tamanho_nucleo_v9: int = 7
-    ) -> Tuple[List[Tuple[Concurso, float, int]], Dict[str, Any]]:
-        
-        if not concursos:
-            raise ValueError("Lista de concursos não pode ser vazia.")
-
-        resultado_ciclo = detectar_ciclo(concursos)
-        faltantes_ciclo = ProbabilisticEngine.identificar_dezenas_faltantes(concursos)
-
-        info_ciclo: Dict[str, Any] = {
-            "ciclo": resultado_ciclo.ciclo,
-            "indice_volatilidade": resultado_ciclo.indice_volatilidade,
-            "peso_recencia": resultado_ciclo.peso_recencia,
-            "dezenas_faltantes": faltantes_ciclo
-        }
-
+    def gerar_jogos(self, concursos: List[Concurso], quantidade: int = 5):
         ultimo_concurso = concursos[-1]
-        dezenas_ultimo = set(ultimo_concurso.dezenas)
-        max_repeticoes = 9 if modo.upper() == "HIBRIDO_V9" else 8
-
-        jogos_avaliados: List[Tuple[Concurso, float, int]] = []
-        usar_hibrido = (modo.upper() == "HIBRIDO_V9" and jogos_base is not None)
-
-        tentativas_maximas = candidatos * 15
+        dezenas_ultimo = list(ultimo_concurso.dezenas)
+        faltantes_ciclo = self.identificar_dezenas_faltantes(concursos)
+        
+        jogos_elite = []
         tentativas = 0
+        # Aumentamos a amostragem para 100 mil para garantir o topo da curva
+        max_tentativas = 100000 
+        
+        # Cache de busca para otimizar velocidade
+        set_dezenas_ultimo = set(dezenas_ultimo)
+        numeros_base = list(range(1, 26))
 
-        while len(jogos_avaliados) < candidatos and tentativas < tentativas_maximas:
+        while len(jogos_elite) < quantidade and tentativas < max_tentativas:
             tentativas += 1
             
-            if usar_hibrido:
-                jogo_molde = random.choice(jogos_base)
-                nucleo = set(random.sample(jogo_molde, tamanho_nucleo_v9))
+            # Construção ultra-rápida do jogo
+            nucleo = random.sample(dezenas_ultimo, 9)
+            # Garante dezenas do ciclo (Janela de Ouro)
+            jogo_set = set(nucleo) | set(faltantes_ciclo)
+            
+            vagas = 15 - len(jogo_set)
+            if vagas > 0:
+                possiveis = [n for n in numeros_base if n not in jogo_set]
+                jogo_set.update(random.sample(possiveis, vagas))
+            
+            dezenas_finais = sorted(list(jogo_set))[:15]
+            
+            # Filtro de Repetição (8, 9 ou 10)
+            rep = len(set(dezenas_finais) & set_dezenas_ultimo)
+            if 8 <= rep <= 10:
+                jogo_obj = Concurso(numero=0, data="", dezenas=tuple(dezenas_finais))
+                resultado = calcular_score_v10(jogo_obj, concursos)
+                score = resultado.score_final if hasattr(resultado, 'score_final') else resultado
                 
-                if len(faltantes_ciclo) <= 3 and len(faltantes_ciclo) > 0:
-                    dezenas_ciclo = set(faltantes_ciclo)
-                else:
-                    faltantes_disponiveis = [d for d in faltantes_ciclo if d not in nucleo]
-                    dezenas_ciclo = set(random.sample(faltantes_disponiveis, min(len(faltantes_disponiveis), 2)))
-                
-                dezenas_atuais = nucleo | dezenas_ciclo
-                vagas_abertas = 15 - len(dezenas_atuais)
-                
-                if vagas_abertas < 0:
-                    dezenas_list = list(dezenas_atuais)
-                    dezenas = sorted(random.sample(dezenas_list, 15))
-                else:
-                    possiveis = list(set(range(1, 26)) - dezenas_atuais)
-                    complemento = random.sample(possiveis, vagas_abertas)
-                    dezenas = sorted(list(dezenas_atuais) + complemento)
-            else:
-                dezenas = sorted(random.sample(range(1, 26), 15))
+                # SÓ CONSIDERA ELITE SE O SCORE FOR REALMENTE ALTO
+                if score >= 1.15:
+                    jogos_elite.append((jogo_obj, score, rep))
+                    # Ordena e mantém apenas os melhores para não pesar a memória
+                    jogos_elite.sort(key=lambda x: x[1], reverse=True)
 
-            repeticoes = len(set(dezenas) & dezenas_ultimo)
-            if repeticoes > max_repeticoes:
-                continue
+        # Se após 100k tentativas não achar 5 de elite (raro), reduz o critério e tenta lote final
+        if len(jogos_elite) < quantidade:
+             # Busca de segurança para preencher a lista rapidamente
+             for _ in range(5000):
+                nucleo = random.sample(dezenas_ultimo, 9)
+                jogo_set = set(nucleo) | set(faltantes_ciclo)
+                vagas = 15 - len(jogo_set)
+                if vagas > 0:
+                    possiveis = [n for n in numeros_base if n not in jogo_set]
+                    jogo_set.update(random.sample(possiveis, vagas))
+                dezenas_finais = sorted(list(jogo_set))[:15]
+                jogo_obj = Concurso(numero=0, data="", dezenas=tuple(dezenas_finais))
+                resultado = calcular_score_v10(jogo_obj, concursos)
+                score = resultado.score_final if hasattr(resultado, 'score_final') else resultado
+                jogos_elite.append((jogo_obj, score, len(set(dezenas_finais) & set_dezenas_ultimo)))
+             
+             jogos_elite.sort(key=lambda x: x[1], reverse=True)
 
-            jogo = Concurso(numero=0, data="", dezenas=tuple(dezenas))
-            resultado_v10 = calcular_score_v10(jogo, concursos)
-            jogos_avaliados.append((jogo, resultado_v10.score_final, repeticoes))
+        return jogos_elite[:quantidade], {"dezenas_faltantes": faltantes_ciclo}
 
-        jogos_ordenados = sorted(jogos_avaliados, key=lambda x: x[1], reverse=True)
-        return jogos_ordenados[:quantidade], info_ciclo
-
-    @staticmethod
-    def salvar_historico_v10(jogos_avaliados: List[Tuple[Concurso, float, int]], alvo: int, arquivo: str = "historico_v10.txt"):
-        """Salva os jogos gerados no arquivo de histórico com o concurso alvo."""
+    def salvar_historico_v10(self, jogos, alvo):
+        timestamp = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
         try:
-            file_exists = os.path.isfile(arquivo)
-            with open(arquivo, "a", encoding="utf-8") as f:
-                if not file_exists:
-                    f.write("CONCURSO_ALVO | DEZENAS | SCORE_V10\n")
-                for jogo_obj, score, _ in jogos_avaliados:
-                    dezenas_str = " ".join(f"{d:02d}" for d in sorted(jogo_obj.dezenas))
-                    f.write(f"{alvo} | {dezenas_str} | {score:.6f}\n")
+            with open("historico_v10.txt", "a", encoding="utf-8") as f:
+                f.write("-" * 80 + "\n")
+                f.write(f"Execução em: {timestamp}\n")
+                f.write(f"Sugestões para o Concurso Alvo: {alvo}\n\n")
+                for i, (jogo_obj, score, rep) in enumerate(jogos, 1):
+                    dez_str = " ".join(f"{d:02d}" for d in sorted(jogo_obj.dezenas))
+                    f.write(f"Jogo {i}: {dez_str}\n")
+                    f.write(f"  Score V10             : {score:.6f}\n")
+                    f.write(f"  Repetições Anteriores : {rep}\n\n")
         except Exception as e:
-            print(f"[ERRO AO SALVAR HISTÓRICO]: {e}")
+            print(f"[ERRO HISTÓRICO]: {e}")
