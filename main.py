@@ -1,4 +1,11 @@
 # main.py — Lotofácil Pro V11  |  Entrypoint principal
+#
+# Fluxo:
+#  1. Sincroniza banco local com API da Caixa  (baixar.py)
+#  2. Carrega concursos                         (database.py → List[Concurso])
+#  3. Gera jogos de elite                       (probabilistic_engine.py)
+#  4. Exibe dashboard Rich com Janela de Ouro
+#  5. Persiste histórico em historico_v10.txt
 
 import os
 import sys
@@ -9,7 +16,18 @@ if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)
 
 try:
+    from rich.console import Console
+    from rich.table import Table
+    from rich.panel import Panel
+    from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn
+    from rich import print as rprint
+except ImportError:
+    print("[ERRO] Biblioteca 'rich' não instalada. Execute: pip install rich")
+    sys.exit(1)
+
+try:
     from core.infrastructure.database.database import carregar_concursos
+    from core.infrastructure.downloader.baixar import baixar_dados_novos
     from core.engine.probabilistic_engine import ProbabilisticEngine
     from core.domain.models import Concurso
 except ImportError as exc:
@@ -20,74 +38,150 @@ from typing import Dict, List, Any, Tuple
 
 # ── Constantes da Janela de Ouro ──────────────────────────────────────────
 JANELA_OURO_MAX_FALTANTES: int  = 4
-JANELA_OURO_MIN_SCORE: float    = 1.18
+JANELA_OURO_MIN_SCORE:     float = 1.18
+
+console = Console()
 
 
 # ══════════════════════════════════════════════════════════════════════════
-#  HELPERS DE APRESENTAÇÃO
+#  APRESENTAÇÃO
 # ══════════════════════════════════════════════════════════════════════════
 
-def _linha(char: str = "─", n: int = 65) -> str:
-    return char * n
+def exibir_cabecalho() -> None:
+    console.print(Panel.fit(
+        "[bold cyan]LOTOFÁCIL PRO V11[/bold cyan] — "
+        "[italic white]Sistema de Análise Preditiva[/italic white]",
+        border_style="bright_blue",
+        subtitle="[bold blue]V11.2 - High Performance[/bold blue]",
+    ))
 
 
-def _status_ciclo(faltantes: List[int], score_medio: float) -> str:
+def sinc_api() -> None:
+    """Sincroniza o banco local com a API da Caixa com barra de progresso."""
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(bar_width=20),
+        TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+        transient=True,
+        console=console,
+    ) as progress:
+        task = progress.add_task(
+            "[cyan]A verificar API da Caixa...", total=100
+        )
+
+        def _callback(percentual: int, numero: int) -> None:
+            progress.update(
+                task,
+                completed=percentual,
+                description=f"[cyan]A baixar concurso #{numero}...",
+            )
+
+        sucesso, mensagem = baixar_dados_novos(callback_progresso=_callback)
+
+    if sucesso:
+        rprint(f"  [green]✔[/green]  {mensagem}")
+    else:
+        rprint(f"  [yellow]⚠[/yellow]  API: {mensagem}")
+
+
+def _calcular_status(
+    faltantes: List[int],
+    score_medio: float,
+) -> Tuple[str, str]:
+    """Devolve (texto_de_status, cor_rich) conforme o estado do ciclo."""
     n = len(faltantes)
     if n == 0:
-        return "🔄  INÍCIO DE NOVO CICLO"
+        return "🔄  INÍCIO DE NOVO CICLO", "cyan"
     if n <= JANELA_OURO_MAX_FALTANTES and score_medio >= JANELA_OURO_MIN_SCORE:
-        return "🏆  JANELA DE OURO ATIVA — MOMENTO IDEAL"
+        return "🏆  JANELA DE OURO ATIVA — APOSTA MÁXIMA", "bold magenta"
     if n <= JANELA_OURO_MAX_FALTANTES:
-        return "🔥  FECHAMENTO DE CICLO PRÓXIMO"
-    return "✅  OPORTUNIDADE ESTATÍSTICA ATIVA"
+        return "🔥  FECHAMENTO DE CICLO PRÓXIMO", "bold red"
+    return "✅  OPORTUNIDADE ESTATÍSTICA ATIVA", "green"
 
 
-def _exibir_dashboard(
-    jogos: List[Tuple[Concurso, float, int]],
-    info: Dict[str, Any],
-    ultimo: Concurso,
-    alvo: int,
-    tempo: float,
+def exibir_dashboard(
+    jogos:       List[Tuple[Concurso, float, int]],
+    info:        Dict[str, Any],
+    ultimo:      Concurso,
+    alvo:        int,
+    tempo_total: float,
 ) -> None:
     faltantes:   List[int] = info.get("dezenas_faltantes", [])
     score_medio: float     = info.get("score_medio", 0.0)
     n_gerados:   int       = info.get("candidatos_gerados", 0)
     n_scored:    int       = info.get("candidatos_scored", 0)
-    status: str            = _status_ciclo(faltantes, score_medio)
 
-    print(_linha("═"))
-    print("       LOTOFÁCIL PRO V11  —  Motor de Decisão Probabilística")
-    print(_linha("═"))
-    print(f"  STATUS   : {status}")
-    print(_linha("─"))
-    print(f"  Concurso : {ultimo.numero} ({ultimo.data})  →  Alvo: #{alvo}")
+    status_texto, status_cor = _calcular_status(faltantes, score_medio)
+
     falt_str = (
-        "  ".join(f"{d:02d}" for d in faltantes)
+        ", ".join(f"{d:02d}" for d in faltantes)
         if faltantes else "Nenhum — ciclo fechado"
     )
-    print(f"  Faltantes: {falt_str}  ({len(faltantes)} de 25)")
-    print(f"  Score médio do lote : {score_medio:.6f}")
-    print(f"  Tempo de execução   : {tempo:.2f}s  "
-          f"({n_gerados} candidatos → {n_scored} pontuados)")
-    print(_linha("─"))
-    print(f"\n  JOGOS SUGERIDOS PARA O CONCURSO #{alvo}:\n")
+
+    # ── Painel de estratégia ──────────────────────────────────────────────
+    console.print(Panel(
+        f"[white]Status:[/white]          [{status_cor}]{status_texto}[/{status_cor}]\n"
+        f"[white]Concurso alvo:[/white]   [bold white]#{alvo}[/bold white]  "
+        f"(último registado: #{ultimo.numero} — {ultimo.data})\n"
+        f"[white]Faltantes:[/white]       [bold yellow]{falt_str}[/bold yellow]  "
+        f"({len(faltantes)} de 25)\n"
+        f"[white]Score médio:[/white]     [bold green]{score_medio:.6f}[/bold green]\n"
+        f"[white]Performance:[/white]     {tempo_total:.2f}s  "
+        f"({n_gerados} candidatos → {n_scored} pontuados)",
+        title="[bold]Análise de Ciclo[/bold]",
+        border_style="bright_black",
+    ))
+
+    # ── Tabela de jogos ───────────────────────────────────────────────────
+    tabela = Table(
+        show_header=True,
+        header_style="bold cyan",
+        border_style="bright_black",
+    )
+    tabela.add_column("ID",                    justify="center", width=4)
+    tabela.add_column("Dezenas Sugeridas",     width=45)
+    tabela.add_column("Score V10",             justify="right",  width=12)
+    tabela.add_column("Rep.",                  justify="center", width=5)
+
+    faltantes_set = set(faltantes)
 
     for i, (jogo_obj, score, rep) in enumerate(jogos, 1):
-        # Acesso tipado e seguro — jogo_obj é sempre um Concurso
-        dezenas: Tuple[int, ...] = jogo_obj.dezenas
-        dez_fmt = "  ".join(f"{d:02d}" for d in sorted(dezenas))
+        # Destaque visual: faltantes em amarelo, restantes em branco suave
+        partes = []
+        for d in sorted(jogo_obj.dezenas):
+            d_str = f"{d:02d}"
+            if d in faltantes_set:
+                partes.append(f"[bold yellow]{d_str}[/bold yellow]")
+            else:
+                partes.append(f"[dim white]{d_str}[/dim white]")
+        dez_fmt = "  ".join(partes)
 
+        # Janela de Ouro por jogo individual
         janela_jogo = (
             len(faltantes) <= JANELA_OURO_MAX_FALTANTES
             and score >= JANELA_OURO_MIN_SCORE
         )
-        sufixo = "  ★ JANELA DE OURO" if janela_jogo else ""
+        id_col = (
+            "[bold magenta]★[/bold magenta]"
+            if janela_jogo
+            else f"[dim]{i:02d}[/dim]"
+        )
 
-        print(f"  Jogo {i}: {dez_fmt}{sufixo}")
-        print(f"          Score V10: {score:.6f}  |  Repetições: {rep}")
-        print()
+        score_cor = "bold green" if score >= JANELA_OURO_MIN_SCORE else "white"
 
-    print(_linha("═"))
+        tabela.add_row(
+            id_col,
+            dez_fmt,
+            f"[{score_cor}]{score:.6f}[/{score_cor}]",
+            str(rep),
+        )
+
+    console.print(tabela)
+    console.print(
+        f"  [dim]★ = Janela de Ouro (faltantes ≤ {JANELA_OURO_MAX_FALTANTES} "
+        f"e score ≥ {JANELA_OURO_MIN_SCORE})[/dim]\n"
+    )
 
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -95,40 +189,42 @@ def _exibir_dashboard(
 # ══════════════════════════════════════════════════════════════════════════
 
 def main() -> None:
-    t0 = time.perf_counter()
+    # Timer inicia AQUI — mede o tempo total de parede (rede + CPU)
+    t0: float = time.perf_counter()
 
-    print(_linha("═"))
-    print("       LOTOFÁCIL PRO V11 — a iniciar...")
-    print(_linha("═"))
+    exibir_cabecalho()
 
-    # 1. Carrega concursos (List[Concurso] garantido pela camada de infra)
+    # 1. Sincronização com API da Caixa
+    sinc_api()
+
+    # 2. Carregamento — carregar_concursos() devolve List[Concurso] (nunca tuplas brutas)
     concursos: List[Concurso] = carregar_concursos()
-
     if not concursos:
-        print("[AVISO] Base de dados vazia. Importe os dados históricos primeiro.")
+        rprint("[bold red]ERRO:[/bold red] Base de dados vazia. "
+               "Verifique a ligação à internet e tente novamente.")
         sys.exit(1)
 
     ultimo: Concurso = concursos[-1]
-    alvo: int        = ultimo.numero + 1
+    alvo:   int      = ultimo.numero + 1
+    rprint(f"  [green]✔[/green]  {len(concursos)} concurso(s) carregado(s) — "
+           f"último: [bold]#{ultimo.numero}[/bold] ({ultimo.data})\n")
 
-    print(f"  ✔  {len(concursos)} concurso(s) carregado(s) — "
-          f"último: #{ultimo.numero} ({ultimo.data})\n")
-
-    # 2. Motor — retorno duplo desempacotado e tipado
+    # 3. Motor probabilístico
     engine: ProbabilisticEngine = ProbabilisticEngine()
 
     jogos: List[Tuple[Concurso, float, int]]
     info:  Dict[str, Any]
-    jogos, info = engine.gerar_jogos(concursos)
 
-    t1 = time.perf_counter()
+    with console.status("[bold yellow]⚙  A calcular jogos de elite..."):
+        jogos, info = engine.gerar_jogos(concursos)
 
-    # 3. Dashboard
-    _exibir_dashboard(jogos, info, ultimo, alvo, t1 - t0)
+    # 4. Dashboard
+    tempo_total: float = time.perf_counter() - t0   # perf_counter inclui I/O e rede
+    exibir_dashboard(jogos, info, ultimo, alvo, tempo_total)
 
-    # 4. Persiste histórico
+    # 5. Persistência
     engine.salvar_historico_v10(jogos, alvo)
-    print("  [OK] Registado em historico_v10.txt\n")
+    rprint(f"  [dim]✔ Dados registados em historico_v10.txt[/dim]\n")
 
 
 if __name__ == "__main__":
