@@ -129,25 +129,19 @@ class ProbabilisticEngine:
         vagas = 15 - n_rep                          # sempre > 0 (REP_MAX ≤ 11 < 15)
 
         # ── Camada 2: Faltantes (soft) ─────────────────────────────────────
-        # Quando o ciclo reinicia faltantes_set == {1..25}, incluindo números
-        # já em `base`. Filtramos `base` aqui para garantir zero sobreposição
-        # entre as camadas 1 e 2.
-        disponiveis_falt = [f for f in faltantes_lista if f not in base]
+        # Faltantes nunca estão em dezenas_ultimo (por definição do ciclo),
+        # portanto não há sobreposição com base.
+        disponiveis_falt = faltantes_lista[:]
         max_falt = min(3, vagas, len(disponiveis_falt))
         n_falt   = random.randint(0, max_falt)
         falt_escolhidos = random.sample(disponiveis_falt, n_falt) if n_falt else []
         vagas -= n_falt
 
         # ── Camada 3: Complemento ponderado por frequência ────────────────
-        # `ocupados` = tudo o que já está reservado nas camadas 1 e 2.
-        # O pool_fill NUNCA pode conter elementos de `ocupados`, caso contrário
-        # a union final produz < 15 dezenas quando o ciclo acabou de reiniciar
-        # (situação em que faltantes_set == {1..25} e inclui dezenas da base).
-        ocupados: Set[int] = base | set(falt_escolhidos)
-
-        pool_comp  = [n for n in complemento_lista if n not in faltantes_set and n not in ocupados]
-        # Faltantes ainda disponíveis (não escolhidos na camada 2 e não em base)
-        pool_extra = [f for f in faltantes_lista if f not in ocupados]
+        # Pool = números fora da base E fora dos faltantes já escolhidos
+        pool_comp  = [n for n in complemento_lista if n not in faltantes_set]
+        # Se necessário, adiciona faltantes ainda disponíveis
+        pool_extra = [f for f in faltantes_lista if f not in falt_escolhidos]
 
         pool_fill  = pool_comp + pool_extra
         pesos_fill = [pesos[n] for n in pool_fill]
