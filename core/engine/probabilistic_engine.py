@@ -250,17 +250,23 @@ class ProbabilisticEngine:
             raise ValueError("A lista de concursos não pode estar vazia.")
 
         # ── PRÉ-CÁLCULO (uma vez) ─────────────────────────────────────────
-        ultimo: Concurso           = concursos[-1]
+        ultimo: Concurso               = concursos[-1]
         dezenas_ultimo_set:   Set[int] = set(ultimo.dezenas)
         dezenas_ultimo_lista: List[int] = list(ultimo.dezenas)
 
-        faltantes_lista: List[int] = self.identificar_dezenas_faltantes(concursos)
+        faltantes_raw: List[int]       = self.identificar_dezenas_faltantes(concursos)
+
+        # Quando todos os 25 números são "faltantes", o ciclo acabou de
+        # reiniciar. Neste estado a camada de faltantes não tem poder
+        # discriminante (todos os números são iguais). Zeramos para que
+        # o motor opere em modo frequência pura → scores mais altos.
+        novo_ciclo: bool           = (len(faltantes_raw) == 25)
+        faltantes_lista: List[int] = [] if novo_ciclo else faltantes_raw
         faltantes_set:  Set[int]   = set(faltantes_lista)
 
         pesos: Dict[int, float]    = self._calcular_pesos_frequencia(concursos)
 
         # Complemento = números que NÃO estão no último concurso e NÃO são faltantes
-        # (faltantes são tratados em camada separada na geração)
         complemento_lista: List[int] = [
             n for n in range(1, 26)
             if n not in dezenas_ultimo_set and n not in faltantes_set
@@ -313,9 +319,10 @@ class ProbabilisticEngine:
         )
 
         ciclo_info: Dict[str, Any] = {
-            "dezenas_faltantes": faltantes_lista,
-            "total_concursos":   len(concursos),
-            "score_medio":       score_medio,
+            "dezenas_faltantes":  faltantes_raw,   # sempre os reais, para exibição
+            "novo_ciclo":         novo_ciclo,
+            "total_concursos":    len(concursos),
+            "score_medio":        score_medio,
             "candidatos_gerados": len(candidatos),
             "candidatos_scored":  len(top),
         }

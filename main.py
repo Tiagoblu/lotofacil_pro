@@ -86,10 +86,13 @@ def sinc_api() -> None:
 
 
 def _calcular_status(
+    novo_ciclo: bool,
     faltantes: List[int],
     score_medio: float,
 ) -> Tuple[str, str]:
     """Devolve (texto_de_status, cor_rich) conforme o estado do ciclo."""
+    if novo_ciclo:
+        return "🔄  INÍCIO DE NOVO CICLO — Análise por Frequência", "cyan"
     n = len(faltantes)
     if n == 0:
         return "🔄  INÍCIO DE NOVO CICLO", "cyan"
@@ -108,16 +111,22 @@ def exibir_dashboard(
     tempo_total: float,
 ) -> None:
     faltantes:   List[int] = info.get("dezenas_faltantes", [])
+    novo_ciclo:  bool      = info.get("novo_ciclo", False)
     score_medio: float     = info.get("score_medio", 0.0)
     n_gerados:   int       = info.get("candidatos_gerados", 0)
     n_scored:    int       = info.get("candidatos_scored", 0)
 
-    status_texto, status_cor = _calcular_status(faltantes, score_medio)
+    status_texto, status_cor = _calcular_status(novo_ciclo, faltantes, score_medio)
 
-    falt_str = (
-        ", ".join(f"{d:02d}" for d in faltantes)
-        if faltantes else "Nenhum — ciclo fechado"
-    )
+    if novo_ciclo:
+        falt_str      = "Novo ciclo iniciado — todos os 25 já saíram"
+        falt_contagem = "ciclo reiniciado"
+    elif faltantes:
+        falt_str      = ", ".join(f"{d:02d}" for d in faltantes)
+        falt_contagem = f"{len(faltantes)} de 25"
+    else:
+        falt_str      = "Nenhum — ciclo fechado"
+        falt_contagem = "0 de 25"
 
     # ── Painel de estratégia ──────────────────────────────────────────────
     console.print(Panel(
@@ -125,7 +134,7 @@ def exibir_dashboard(
         f"[white]Concurso alvo:[/white]   [bold white]#{alvo}[/bold white]  "
         f"(último registado: #{ultimo.numero} — {ultimo.data})\n"
         f"[white]Faltantes:[/white]       [bold yellow]{falt_str}[/bold yellow]  "
-        f"({len(faltantes)} de 25)\n"
+        f"({falt_contagem})\n"
         f"[white]Score médio:[/white]     [bold green]{score_medio:.6f}[/bold green]\n"
         f"[white]Performance:[/white]     {tempo_total:.2f}s  "
         f"({n_gerados} candidatos → {n_scored} pontuados)",
@@ -144,10 +153,11 @@ def exibir_dashboard(
     tabela.add_column("Score V10",             justify="right",  width=12)
     tabela.add_column("Rep.",                  justify="center", width=5)
 
-    faltantes_set = set(faltantes)
+    faltantes_set = set(faltantes) if not novo_ciclo else set()
 
     for i, (jogo_obj, score, rep) in enumerate(jogos, 1):
         # Destaque visual: faltantes em amarelo, restantes em branco suave
+        # Em novo_ciclo não há faltantes reais → todas as dezenas em branco
         partes = []
         for d in sorted(jogo_obj.dezenas):
             d_str = f"{d:02d}"
@@ -157,9 +167,10 @@ def exibir_dashboard(
                 partes.append(f"[dim white]{d_str}[/dim white]")
         dez_fmt = "  ".join(partes)
 
-        # Janela de Ouro por jogo individual
+        # Janela de Ouro: não se aplica em novo ciclo (sem faltantes reais)
         janela_jogo = (
-            len(faltantes) <= JANELA_OURO_MAX_FALTANTES
+            not novo_ciclo
+            and len(faltantes) <= JANELA_OURO_MAX_FALTANTES
             and score >= JANELA_OURO_MIN_SCORE
         )
         id_col = (

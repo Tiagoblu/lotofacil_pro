@@ -1,5 +1,5 @@
 git add .
-git commit -m "CORREÇÕES DA CLAUDE DO MAIN E PROBABILISTIC E DATABASE PRA MELHORAR SCORE E TEMPO PARA GERAR OS JOGOS"
+git commit -m "Corrigido o main e probabistic engine"
 git push
 
 
