@@ -1,5 +1,5 @@
 git add .
-git commit -m "Corrigido o main e probabistic engine"
+git commit -m "Sistema Ok e atualizado"
 git push
 
 
