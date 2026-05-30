@@ -1,8 +1,13 @@
 git add .
-git commit -m "Sistema Ok e atualizado"
+git commit -m "atualizando banco de dados"
 git push
 
 
 git add .
 git commit -m "chore: inicio da fase de coleta de dados em produção (concursos 3643 a 3660)"
+git push
+
+
+git add .
+git commit -m "correção de erros seção 1"
 git push
