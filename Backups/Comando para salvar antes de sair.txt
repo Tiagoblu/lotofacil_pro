@@ -8,6 +8,3 @@ git commit -m "chore: inicio da fase de coleta de dados em produção (concursos
 git push
 
 
-git add .
-git commit -m "correção de erros seção 1"
-git push
