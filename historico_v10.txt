@@ -129369,3 +129369,27 @@ Jogo 5: 02 05 06 08 09 10 11 13 15 19 20 22 23 24 25
   Score V10             : 1.005481
   Repetições Anteriores : 9
 
+--------------------------------------------------------------------------------
+Execução em: 10/06/2026 20:01:25
+Sugestões para o Concurso Alvo: 3707
+
+Jogo 1: 01 02 08 09 10 13 14 15 17 18 19 20 22 23 24
+  Score V10             : 1.055267
+  Repetições Anteriores : 9
+
+Jogo 2: 02 03 08 09 10 12 14 15 16 17 20 21 23 24 25
+  Score V10             : 1.043165
+  Repetições Anteriores : 10
+
+Jogo 3: 02 03 07 08 09 10 14 15 17 18 19 21 22 23 24
+  Score V10             : 1.020577
+  Repetições Anteriores : 9
+
+Jogo 4: 01 02 05 08 09 13 14 15 17 18 21 22 23 24 25
+  Score V10             : 1.004715
+  Repetições Anteriores : 10
+
+Jogo 5: 01 02 03 04 09 11 14 17 18 19 21 22 23 24 25
+  Score V10             : 1.000844
+  Repetições Anteriores : 9
+
