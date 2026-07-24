@@ -11,6 +11,15 @@ st.set_page_config(
     layout="wide"
 )
 
+# 🎨 Opcional: Esconde menus do Streamlit e barra superior para um visual mais limpo
+st.markdown("""
+    <style>
+    #MainMenu {visibility: hidden;}
+    header {visibility: hidden;}
+    footer {visibility: hidden;}
+    </style>
+    """, unsafe_allow_html=True)
+
 # ── CARREGAMENTO DE DADOS BLINDADO & DINÂMICO ─────────────────────────
 @st.cache_data(ttl=300)
 def carregar_dados_e_calcular():
@@ -30,7 +39,6 @@ def carregar_dados_e_calcular():
             conn.close()
             return None, "O banco SQLite está vazio (sem tabelas)."
 
-        # Prioriza 'concursos' ou 'resultados', senão pega a primeira tabela que existir
         target_table = None
         for t in ['concursos', 'resultados', 'concursos_novo']:
             if t in table_names:
@@ -55,7 +63,6 @@ def carregar_dados_e_calcular():
             break
 
     if col_concurso:
-        # Ordena pelo concurso
         df[col_concurso] = pd.to_numeric(df[col_concurso], errors='coerce')
         df = df.dropna(subset=[col_concurso]).sort_values(by=col_concurso, ascending=True).reset_index(drop=True)
         ultimo_concurso = int(df[col_concurso].iloc[-1])
@@ -108,11 +115,11 @@ def carregar_dados_e_calcular():
         for d in jogo:
             freq[d] += 1
 
-    # 6. Gerador Preditivo & Cálculo Score V10
+    # 6. Gerador Preditivo & Cálculo Score V10 (Gera até 50 jogos TOP)
     candidatos = []
     random.seed(concurso_alvo)
 
-    for _ in range(500):
+    for _ in range(1000):
         num_faltantes_incluir = min(qtd_faltantes, random.choice([2, 3, 4]) if qtd_faltantes >= 3 else qtd_faltantes)
         escolhidas_faltantes = random.sample(faltantes, num_faltantes_incluir) if qtd_faltantes > 0 else []
         
@@ -140,7 +147,7 @@ def carregar_dados_e_calcular():
         if c['dezenas_str'] not in vistos:
             vistos.add(c['dezenas_str'])
             jogos_unicos.append(c)
-        if len(jogos_unicos) == 5:
+        if len(jogos_unicos) == 50:  # Guarda os top 50 jogos únicos
             break
 
     for idx, j in enumerate(jogos_unicos, start=1):
@@ -160,10 +167,6 @@ dados, erro = carregar_dados_e_calcular()
 st.title("🎯 Lotofácil Pro V11")
 st.caption("Sistema de Análise Preditiva & Inteligência Estatística")
 
-col_head1, col_head2 = st.columns([3, 1])
-with col_head2:
-    modo_pro = st.toggle("⚙️ Modo Avançado / Pro", value=False)
-
 st.divider()
 
 if erro:
@@ -173,7 +176,24 @@ else:
     ultimo_concurso = f"#{dados['ultimo_concurso']}"
     faltantes = dados['faltantes']
     qtd_faltantes = dados['qtd_faltantes']
-    jogos = dados['jogos']
+    todos_jogos = dados['jogos']
+
+    # Controles de quantidade e visualização na mesma linha
+    c_ctrl1, c_ctrl2 = st.columns([3, 1])
+    with c_ctrl1:
+        qtd_gerar = st.slider(
+            "🎲 Quantidade de Jogos Desejada:", 
+            min_value=5, 
+            max_value=30, 
+            value=5, 
+            step=5,
+            help="Arraste para escolher quantos palpites quer visualizar."
+        )
+    with c_ctrl2:
+        st.write("") # Espaçamento vertical
+        modo_pro = st.toggle("⚙️ Modo Avançado / Pro", value=False)
+
+    jogos_filtrados = todos_jogos[:qtd_gerar]
 
     if qtd_faltantes <= 4:
         status_texto = "🔥 FECHAMENTO DE CICLO PRÓXIMO"
@@ -188,10 +208,10 @@ else:
         
         alerta_cor(f"**SITUAÇÃO DO CICLO:** {status_texto} (Faltam {qtd_faltantes} dezenas).")
         
-        st.markdown("### 📋 Sugestões de Jogos para Hoje")
+        st.markdown(f"### 📋 Sugestões de {qtd_gerar} Jogos para Hoje")
         st.caption("Escolha seus palpites e clique no código para copiar:")
         
-        for jogo in jogos:
+        for jogo in jogos_filtrados:
             with st.container(border=True):
                 col_a, col_b = st.columns([4, 1])
                 with col_a:
@@ -208,12 +228,12 @@ else:
         m2.metric("Status do Ciclo", status_texto)
         m3.metric("Faltantes no Ciclo", f"{qtd_faltantes} de 25")
         
-        score_medio = sum(j['score'] for j in jogos) / len(jogos)
-        m4.metric("Score Médio V10", f"{score_medio:.4f}")
+        score_medio = sum(j['score'] for j in jogos_filtrados) / len(jogos_filtrados)
+        m4.metric("Score Médio dos Selecionados", f"{score_medio:.4f}")
 
         st.warning(f"**Dezenas Faltantes para Fechamento:** `{', '.join(faltantes)}`")
         
-        st.markdown("### 📊 Tabela Preditiva Detalhada (Motor V11.2)")
+        st.markdown(f"### 📊 Tabela Preditiva Detalhada ({qtd_gerar} Jogos)")
         
         df_tabela = pd.DataFrame([
             {
@@ -221,7 +241,7 @@ else:
                 "Dezenas Sugeridas (15 números)": j['dezenas_str'],
                 "Score V10": j['score'],
                 "Repetições": j['rep']
-            } for j in jogos
+            } for j in jogos_filtrados
         ])
         
         st.dataframe(
