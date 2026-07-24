@@ -180,20 +180,22 @@ with col_help:
         O **Lotofácil Pro** utiliza um motor estatístico avançado para gerar apostas com alta probabilidade matemática baseada no comportamento histórico dos sorteios.
 
         ---
+        #### ⭐ O MELHOR MOMENTO PARA APOSTAR (Janela de Ouro)
+        A **Janela de Ouro** ocorre quando a matemática atinge seu ponto ideal de oportunidade para apostar:
+        * **Requisitos:** Dezenas Faltantes no Ciclo **≤ 4** e Score V10 **≥ 1.1800**.
+        * **Por que apostar nesse momento?** É quando o fechamento do ciclo de dezenas se alinha perfeitamente com os números mais quentes dos últimos sorteios, criando o melhor cenário estatístico possível para maximizar os acertos.
+
+        ---
         #### 🔄 1. O que é o Ciclo da Lotofácil?
-        Um **ciclo** é o período em que todas as 25 dezenas são sorteadas ao menos uma vez.
+        Um **ciclo** é o período necessário para que todas as 25 dezenas sejam sorteadas ao menos uma vez.
         * **Faltantes no Ciclo:** São os números que ainda não saíram no ciclo atual.
-        * O sistema ajusta automaticamente a taxa de inserção desses números faltantes em cada palpite gerado.
+        * O sistema ajusta automaticamente a quantidade ideal desses números em cada palpite.
 
         ---
         #### 📊 2. O que é o Score V10?
-        O **Score V10** é o índice de inteligência do jogo (quanto maior, melhor):
-        * **Média Geral:** `1.1000` a `1.1500` (Jogos equilibrados com alta frequência).
-        * **Janela de Ouro (`≥ 1.1800`):** Combinação ideal entre dezenas quente-recentes e o fechamento do ciclo.
-
-        ---
-        #### 💡 Dica de Aposta
-        Quando o **Status do Ciclo** indicar *🔥 FECHAMENTO DE CICLO PRÓXIMO* (faltando 4 dezenas ou menos), o sistema entra na sua zona máxima de precisão!
+        O **Score V10** mede a força matemática individual de cada jogo (quanto maior, melhor):
+        * **Média Padrão:** `1.1000` a `1.1500` (Jogos bem equilibrados).
+        * **Zona de Elite:** `≥ 1.1800` (Jogos com máxima convergência estatística).
         """)
 
 st.divider()
@@ -225,7 +227,7 @@ else:
     jogos_filtrados = todos_jogos[:qtd_gerar]
 
     if qtd_faltantes <= 4:
-        status_texto = "🔥 FECHAMENTO DE CICLO PRÓXIMO"
+        status_texto = "🔥 FECHAMENTO DE CICLO PRÓXIMO (JANELA DE OURO)"
         alerta_cor = st.success
     else:
         status_texto = "⏳ CICLO EM EMISSÃO (Aguardar maturação)"
@@ -285,7 +287,7 @@ else:
             hide_index=True
         )
         
-        st.caption("★ **Janela de Ouro:** Exige Faltantes ≤ 4 e Score V10 ≥ 1.18.")
+        st.caption("★ **Janela de Ouro (Melhor Momento para Apostar):** Exige Faltantes ≤ 4 e Score V10 ≥ 1.18.")
 
 st.divider()
 st.caption("© 2026 Lotofácil Pro V11 — Todos os direitos reservados.")
