@@ -166,8 +166,35 @@ def carregar_dados_e_calcular():
 # ── EXECUÇÃO E INTERFACE STREAMLIT ────────────────────────────────────
 dados, erro = carregar_dados_e_calcular()
 
-st.title("🎯 Lotofácil Pro V11")
-st.caption("Sistema de Análise Preditiva & Inteligência Estatística")
+# Cabeçalho Principal e Botão de Ajuda
+col_title, col_help = st.columns([3, 1])
+with col_title:
+    st.title("🎯 Lotofácil Pro V11")
+    st.caption("Sistema de Análise Preditiva & Inteligência Estatística")
+
+with col_help:
+    st.write("") # Alinhamento
+    with st.popover("ℹ️ Como Funciona & Score V10"):
+        st.markdown("### 📘 Guia do Lotofácil Pro V11")
+        st.markdown("""
+        O **Lotofácil Pro** utiliza um motor estatístico avançado para gerar apostas com alta probabilidade matemática baseada no comportamento histórico dos sorteios.
+
+        ---
+        #### 🔄 1. O que é o Ciclo da Lotofácil?
+        Um **ciclo** é o período em que todas as 25 dezenas são sorteadas ao menos uma vez.
+        * **Faltantes no Ciclo:** São os números que ainda não saíram no ciclo atual.
+        * O sistema ajusta automaticamente a taxa de inserção desses números faltantes em cada palpite gerado.
+
+        ---
+        #### 📊 2. O que é o Score V10?
+        O **Score V10** é o índice de inteligência do jogo (quanto maior, melhor):
+        * **Média Geral:** `1.1000` a `1.1500` (Jogos equilibrados com alta frequência).
+        * **Janela de Ouro (`≥ 1.1800`):** Combinação ideal entre dezenas quente-recentes e o fechamento do ciclo.
+
+        ---
+        #### 💡 Dica de Aposta
+        Quando o **Status do Ciclo** indicar *🔥 FECHAMENTO DE CICLO PRÓXIMO* (faltando 4 dezenas ou menos), o sistema entra na sua zona máxima de precisão!
+        """)
 
 st.divider()
 
@@ -180,7 +207,7 @@ else:
     qtd_faltantes = dados['qtd_faltantes']
     todos_jogos = dados['jogos']
 
-    # Controles de quantidade e visualização na mesma linha
+    # Controles de quantidade e visualização
     c_ctrl1, c_ctrl2 = st.columns([3, 1])
     with c_ctrl1:
         qtd_gerar = st.slider(
@@ -189,7 +216,7 @@ else:
             max_value=30, 
             value=5, 
             step=5,
-            help="Arraste para escolher quantos palpites quer visualizar."
+            help="Arraste para escolher quantos palpites deseja visualizar."
         )
     with c_ctrl2:
         st.write("") # Espaçamento vertical
@@ -220,18 +247,18 @@ else:
                     st.markdown(f"**Jogo #{jogo['id']}**")
                     st.code(jogo['dezenas_str'], language=None)
                 with col_b:
-                    st.caption("Score V10:")
+                    st.caption("Score V10:", help="Índice de força matemática do palpite. Quanto maior que 1.10, melhor.")
                     st.write(f"**{jogo['score']:.4f}**")
 
     # ── MODO AVANÇADO / PRO ───────────────────────────────────────────
     else:
         m1, m2, m3, m4 = st.columns(4)
-        m1.metric("Concurso Alvo", concurso_alvo)
-        m2.metric("Status do Ciclo", status_texto)
-        m3.metric("Faltantes no Ciclo", f"{qtd_faltantes} de 25")
+        m1.metric("Concurso Alvo", concurso_alvo, help="Próximo concurso a ser sorteado")
+        m2.metric("Status do Ciclo", status_texto, help="Indica a fase atual do ciclo de sorteios")
+        m3.metric("Faltantes no Ciclo", f"{qtd_faltantes} de 25", help="Quantidade de números que ainda não saíram no ciclo atual")
         
         score_medio = sum(j['score'] for j in jogos_filtrados) / len(jogos_filtrados)
-        m4.metric("Score Médio dos Selecionados", f"{score_medio:.4f}")
+        m4.metric("Score Médio dos Selecionados", f"{score_medio:.4f}", help="Média do Score V10 dos jogos exibidos na tela")
 
         st.warning(f"**Dezenas Faltantes para Fechamento:** `{', '.join(faltantes)}`")
         
@@ -249,7 +276,10 @@ else:
         st.dataframe(
             df_tabela,
             column_config={
-                "Score V10": st.column_config.NumberColumn(format="%.6f")
+                "Score V10": st.column_config.NumberColumn(
+                    format="%.6f",
+                    help="Score V10 individual do bilhete"
+                )
             },
             use_container_width=True,
             hide_index=True
