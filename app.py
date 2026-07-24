@@ -11,42 +11,86 @@ st.set_page_config(
     layout="wide"
 )
 
-# ── CARREGAMENTO DE DADOS E MOTOR ESTATÍSTICO ─────────────────────────
-@st.cache_data(ttl=600)  # Cache de 10 minutos
+# ── CARREGAMENTO DE DADOS BLINDADO & DINÂMICO ─────────────────────────
+@st.cache_data(ttl=300)
 def carregar_dados_e_calcular():
     db_path = "database/lotofacil.db"
     
     if not os.path.exists(db_path):
-        return None, "Banco de dados não encontrado no caminho 'database/lotofacil.db'."
+        return None, f"Arquivo '{db_path}' não encontrado no repositório."
 
-    conn = sqlite3.connect(db_path)
-    
-    # 1. Carrega histórico de resultados da tabela 'concursos'
     try:
-        df = pd.read_sql_query("SELECT * FROM concursos ORDER BY concurso ASC", conn)
+        conn = sqlite3.connect(db_path)
+        
+        # 1. Detecta as tabelas existentes no banco SQLite automaticamente
+        tables_df = pd.read_sql_query("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%';", conn)
+        table_names = tables_df['name'].tolist()
+        
+        if not table_names:
+            conn.close()
+            return None, "O banco SQLite está vazio (sem tabelas)."
+
+        # Prioriza 'concursos' ou 'resultados', senão pega a primeira tabela que existir
+        target_table = None
+        for t in ['concursos', 'resultados', 'concursos_novo']:
+            if t in table_names:
+                target_table = t
+                break
+        if not target_table:
+            target_table = table_names[0]
+
+        df = pd.read_sql_query(f"SELECT * FROM {target_table}", conn)
         conn.close()
     except Exception as e:
-        conn.close()
-        return None, f"Erro ao ler tabela 'concursos': {e}"
+        return None, f"Erro de conexão com o banco de dados: {e}"
 
     if df.empty:
-        return None, "Banco de dados vazio."
+        return None, f"A tabela '{target_table}' não possui registros."
 
-    ultimo_concurso = int(df['concurso'].max())
+    # 2. Localiza a coluna do número do concurso dinamicamente
+    col_concurso = None
+    for c in df.columns:
+        if any(term in c.lower() for term in ['concurs', 'num', 'id']):
+            col_concurso = c
+            break
+
+    if col_concurso:
+        # Ordena pelo concurso
+        df[col_concurso] = pd.to_numeric(df[col_concurso], errors='coerce')
+        df = df.dropna(subset=[col_concurso]).sort_values(by=col_concurso, ascending=True).reset_index(drop=True)
+        ultimo_concurso = int(df[col_concurso].iloc[-1])
+    else:
+        ultimo_concurso = len(df)
+
     concurso_alvo = ultimo_concurso + 1
-    data_ultimo = df[df['concurso'] == ultimo_concurso]['data'].values[0] if 'data' in df.columns else ""
 
-    # 2. Análise de Ciclo (Dezenas Faltantes)
-    cols_dezenas = [c for c in df.columns if c.startswith('bola') or c.startswith('d') or c.startswith('b')]
-    if not cols_dezenas:
-        cols_dezenas = df.columns[-15:]
+    # 3. Extrai as 15 dezenas (1 a 25) de cada sorteio dinamicamente
+    historico_sorteios = []
+    numeric_cols = [c for c in df.columns if c != col_concurso]
 
+    for _, row in df.iterrows():
+        dezenas_jogo = set()
+        for col in numeric_cols:
+            val = row[col]
+            if pd.notnull(val):
+                try:
+                    v_int = int(val)
+                    if 1 <= v_int <= 25:
+                        dezenas_jogo.add(v_int)
+                except (ValueError, TypeError):
+                    pass
+        if len(dezenas_jogo) >= 15:
+            historico_sorteios.append(sorted(list(dezenas_jogo))[:15])
+
+    if not historico_sorteios:
+        return None, "Não foi possível extrair as dezenas dos jogos na tabela."
+
+    # 4. Análise do Ciclo (Dezenas Faltantes)
     todas_dezenas = set(range(1, 26))
     dezenas_sorteadas_ciclo = set()
     
-    for _, row in df.iloc[::-1].iterrows():
-        sorteadas_jogo = set(int(row[c]) for c in cols_dezenas if pd.notnull(row[c]))
-        dezenas_sorteadas_ciclo.update(sorteadas_jogo)
+    for jogo in reversed(historico_sorteios):
+        dezenas_sorteadas_ciclo.update(jogo)
         if len(dezenas_sorteadas_ciclo) == 25:
             break
 
@@ -57,18 +101,14 @@ def carregar_dados_e_calcular():
     faltantes = sorted(list(faltantes_set))
     qtd_faltantes = len(faltantes)
 
-    # 3. Frequência das últimas 30 rodadas
-    ultimos_30 = df.tail(30)
+    # 5. Frequência das Últimas 30 Rodadas
+    ultimos_30 = historico_sorteios[-30:]
     freq = {d: 0 for d in range(1, 26)}
-    
-    for _, row in ultimos_30.iterrows():
-        for c in cols_dezenas:
-            if pd.notnull(row[c]):
-                val = int(row[c])
-                if val in freq:
-                    freq[val] += 1
+    for jogo in ultimos_30:
+        for d in jogo:
+            freq[d] += 1
 
-    # 4. Gerador Preditivo e Calculador do Score V10
+    # 6. Gerador Preditivo & Cálculo Score V10
     candidatos = []
     random.seed(concurso_alvo)
 
@@ -109,13 +149,12 @@ def carregar_dados_e_calcular():
     return {
         "ultimo_concurso": ultimo_concurso,
         "concurso_alvo": concurso_alvo,
-        "data_ultimo": data_ultimo,
         "faltantes": [f"{d:02d}" for d in faltantes],
         "qtd_faltantes": qtd_faltantes,
         "jogos": jogos_unicos
     }, None
 
-# ── EXECUÇÃO E INTERFACE ──────────────────────────────────────────────
+# ── EXECUÇÃO E INTERFACE STREAMLIT ────────────────────────────────────
 dados, erro = carregar_dados_e_calcular()
 
 st.title("🎯 Lotofácil Pro V11")
@@ -129,7 +168,6 @@ st.divider()
 
 if erro:
     st.error(f"⚠️ {erro}")
-    st.info("Verifique se o arquivo `database/lotofacil.db` possui a tabela `concursos` preenchida.")
 else:
     concurso_alvo = f"#{dados['concurso_alvo']}"
     ultimo_concurso = f"#{dados['ultimo_concurso']}"
@@ -144,6 +182,7 @@ else:
         status_texto = "⏳ CICLO EM EMISSÃO (Aguardar maturação)"
         alerta_cor = st.info
 
+    # ── MODO INICIANTE / LEIGO ────────────────────────────────────────
     if not modo_pro:
         st.info(f"📌 **Concurso Alvo:** {concurso_alvo} | **Último cadastrado:** {ultimo_concurso}")
         
@@ -162,6 +201,7 @@ else:
                     st.caption("Score V10:")
                     st.write(f"**{jogo['score']:.4f}**")
 
+    # ── MODO AVANÇADO / PRO ───────────────────────────────────────────
     else:
         m1, m2, m3, m4 = st.columns(4)
         m1.metric("Concurso Alvo", concurso_alvo)
