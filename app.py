@@ -17,17 +17,17 @@ def carregar_dados_e_calcular():
     db_path = "database/lotofacil.db"
     
     if not os.path.exists(db_path):
-        return None, "Banco de dados não encontrado."
+        return None, "Banco de dados não encontrado no caminho 'database/lotofacil.db'."
 
     conn = sqlite3.connect(db_path)
     
-    # 1. Carrega histórico de resultados
+    # 1. Carrega histórico de resultados da tabela 'concursos'
     try:
-        df = pd.read_sql_query("SELECT * FROM resultados ORDER BY concurso ASC", conn)
+        df = pd.read_sql_query("SELECT * FROM concursos ORDER BY concurso ASC", conn)
         conn.close()
     except Exception as e:
         conn.close()
-        return None, f"Erro ao ler banco de dados: {e}"
+        return None, f"Erro ao ler tabela 'concursos': {e}"
 
     if df.empty:
         return None, "Banco de dados vazio."
@@ -37,7 +37,7 @@ def carregar_dados_e_calcular():
     data_ultimo = df[df['concurso'] == ultimo_concurso]['data'].values[0] if 'data' in df.columns else ""
 
     # 2. Análise de Ciclo (Dezenas Faltantes)
-    cols_dezenas = [c for c in df.columns if c.startswith('bola') or c.startswith('d')]
+    cols_dezenas = [c for c in df.columns if c.startswith('bola') or c.startswith('d') or c.startswith('b')]
     if not cols_dezenas:
         cols_dezenas = df.columns[-15:]
 
@@ -129,7 +129,7 @@ st.divider()
 
 if erro:
     st.error(f"⚠️ {erro}")
-    st.info("Verifique se o arquivo `database/lotofacil.db` está atualizado no GitHub.")
+    st.info("Verifique se o arquivo `database/lotofacil.db` possui a tabela `concursos` preenchida.")
 else:
     concurso_alvo = f"#{dados['concurso_alvo']}"
     ultimo_concurso = f"#{dados['ultimo_concurso']}"
