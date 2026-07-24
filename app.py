@@ -12,7 +12,7 @@ st.set_page_config(
 )
 
 # ── CARREGAMENTO DE DADOS E MOTOR ESTATÍSTICO ─────────────────────────
-@st.cache_data(ttl=600)  # Cache de 10 minutos para alta performance
+@st.cache_data(ttl=600)  # Cache de 10 minutos
 def carregar_dados_e_calcular():
     db_path = "database/lotofacil.db"
     
@@ -37,13 +37,10 @@ def carregar_dados_e_calcular():
     data_ultimo = df[df['concurso'] == ultimo_concurso]['data'].values[0] if 'data' in df.columns else ""
 
     # 2. Análise de Ciclo (Dezenas Faltantes)
-    # Extrai colunas das dezenas (ex: bola1 a bola15 ou d1 a d15)
     cols_dezenas = [c for c in df.columns if c.startswith('bola') or c.startswith('d')]
     if not cols_dezenas:
-        # Tenta pegar as últimas 15 colunas se não encontrar padrão de nome
         cols_dezenas = df.columns[-15:]
 
-    # Rastrea fechamento do ciclo atual
     todas_dezenas = set(range(1, 26))
     dezenas_sorteadas_ciclo = set()
     
@@ -51,22 +48,18 @@ def carregar_dados_e_calcular():
         sorteadas_jogo = set(int(row[c]) for c in cols_dezenas if pd.notnull(row[c]))
         dezenas_sorteadas_ciclo.update(sorteadas_jogo)
         if len(dezenas_sorteadas_ciclo) == 25:
-            # Ciclo fechou aqui!
             break
 
     faltantes_set = todas_dezenas - dezenas_sorteadas_ciclo
-    # Se o ciclo acabou de fechar, o novo ciclo precisa das 25
     if len(faltantes_set) == 0:
         faltantes_set = todas_dezenas
 
     faltantes = sorted(list(faltantes_set))
     qtd_faltantes = len(faltantes)
 
-    # 3. Frequência das últimas 10 e 30 rodadas
+    # 3. Frequência das últimas 30 rodadas
     ultimos_30 = df.tail(30)
-    freq = {}
-    for d in range(1, 26):
-        freq[d] = 0
+    freq = {d: 0 for d in range(1, 26)}
     
     for _, row in ultimos_30.iterrows():
         for c in cols_dezenas:
@@ -76,12 +69,10 @@ def carregar_dados_e_calcular():
                     freq[val] += 1
 
     # 4. Gerador Preditivo e Calculador do Score V10
-     candidatos = []
-    # Usamos uma semente determinística baseada no concurso para manter constante no dia
+    candidatos = []
     random.seed(concurso_alvo)
 
-    for _ in range(500): # Amostragem rápida de candidatos
-        # Força incluir entre 2 e 4 faltantes do ciclo
+    for _ in range(500):
         num_faltantes_incluir = min(qtd_faltantes, random.choice([2, 3, 4]) if qtd_faltantes >= 3 else qtd_faltantes)
         escolhidas_faltantes = random.sample(faltantes, num_faltantes_incluir) if qtd_faltantes > 0 else []
         
@@ -90,7 +81,6 @@ def carregar_dados_e_calcular():
         
         jogo_completo = sorted(escolhidas_faltantes + resto)
         
-        # Pontuação Score V10 (baseada na frequência ponderada + peso do ciclo)
         score_base = sum(freq[d] for d in jogo_completo) / 15.0
         peso_ciclo = sum(1.25 for d in jogo_completo if d in faltantes) / max(1, qtd_faltantes)
         score_v10 = round(1.0 + (score_base / 30.0) * 0.1 + peso_ciclo * 0.05, 6)
@@ -102,7 +92,6 @@ def carregar_dados_e_calcular():
             "rep": 9
         })
 
-    # Ordena pelo maior Score V10 e pega os 5 melhores únicos
     candidatos = sorted(candidatos, key=lambda x: x['score'], reverse=True)
     jogos_unicos = []
     vistos = set()
@@ -114,7 +103,6 @@ def carregar_dados_e_calcular():
         if len(jogos_unicos) == 5:
             break
 
-    # Atribui IDs 01 a 05
     for idx, j in enumerate(jogos_unicos, start=1):
         j['id'] = f"{idx:02d}"
 
@@ -130,7 +118,6 @@ def carregar_dados_e_calcular():
 # ── EXECUÇÃO E INTERFACE ──────────────────────────────────────────────
 dados, erro = carregar_dados_e_calcular()
 
-# Cabeçalho
 st.title("🎯 Lotofácil Pro V11")
 st.caption("Sistema de Análise Preditiva & Inteligência Estatística")
 
@@ -150,7 +137,6 @@ else:
     qtd_faltantes = dados['qtd_faltantes']
     jogos = dados['jogos']
 
-    # Status de alerta do ciclo
     if qtd_faltantes <= 4:
         status_texto = "🔥 FECHAMENTO DE CICLO PRÓXIMO"
         alerta_cor = st.success
@@ -158,7 +144,6 @@ else:
         status_texto = "⏳ CICLO EM EMISSÃO (Aguardar maturação)"
         alerta_cor = st.info
 
-    # ── VISÃO DO USUÁRIO LEIGO / INICIANTE (MODO PADRÃO) ───────────────
     if not modo_pro:
         st.info(f"📌 **Concurso Alvo:** {concurso_alvo} | **Último cadastrado:** {ultimo_concurso}")
         
@@ -177,7 +162,6 @@ else:
                     st.caption("Score V10:")
                     st.write(f"**{jogo['score']:.4f}**")
 
-    # ── VISÃO DO USUÁRIO AVANÇADO (MODO PRO) ───────────────────────────
     else:
         m1, m2, m3, m4 = st.columns(4)
         m1.metric("Concurso Alvo", concurso_alvo)
