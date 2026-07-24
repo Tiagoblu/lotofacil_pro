@@ -174,28 +174,33 @@ with col_title:
 
 with col_help:
     st.write("") # Alinhamento
-    with st.popover("ℹ️ Como Funciona & Score V10"):
-        st.markdown("### 📘 Guia do Lotofácil Pro V11")
+    with st.popover("ℹ️ Como Funciona, Etapas e Ciclos"):
+        st.markdown("### 📘 Guia Completo: Etapas, Ciclos & Score V10")
         st.markdown("""
-        O **Lotofácil Pro** utiliza um motor estatístico avançado para gerar apostas com alta probabilidade matemática baseada no comportamento histórico dos sorteios.
+        O **Lotofácil Pro V11** opera combinando estatística descritiva e matemática probabilística. Entenda abaixo como funcionam todas as etapas do ciclo de sorteios e a pontuação do sistema:
 
         ---
-        #### ⭐ O MELHOR MOMENTO PARA APOSTAR (Janela de Ouro)
-        A **Janela de Ouro** ocorre quando a matemática atinge seu ponto ideal de oportunidade para apostar:
-        * **Requisitos:** Dezenas Faltantes no Ciclo **≤ 4** e Score V10 **≥ 1.1800**.
-        * **Por que apostar nesse momento?** É quando o fechamento do ciclo de dezenas se alinha perfeitamente com os números mais quentes dos últimos sorteios, criando o melhor cenário estatístico possível para maximizar os acertos.
+        #### 🔄 As 3 Etapas do Ciclo da Lotofácil
+        Um **Ciclo** é o período necessário para que todas as 25 dezenas sejam sorteadas pelo menos uma vez.
+
+        * **🟢 Etapa 1: Início do Ciclo (Faltam 10 a 25 dezenas)**
+          * Ocorre logo após o fechamento do ciclo anterior.
+          * **Característica:** Grande dispersão de dezenas. As primeiras rodadas servem para mapear a força inicial de cada número no novo ciclo.
+          
+        * **🟡 Etapa 2: Maturação (Faltam 5 a 9 dezenas)**
+          * O ciclo ganha consistência e padronização.
+          * **Característica:** Fase intermediária. O sistema começa a afunilar os números quentes com os faltantes mais prováveis.
+
+        * **🔥 Etapa 3: Fechamento / JANELA DE OURO (Faltam ≤ 4 dezenas)**
+          * **MOMENTO IDEAL DE APOSTA!** Estatisticamente, a maioria dos ciclos da Lotofácil fecha entre 4 e 5 concursos.
+          * **Requisitos da Janela de Ouro:** Faltantes **≤ 4** e Score V10 **≥ 1.1800**.
+          * **Por que apostar aqui?** É o ponto em que a probabilidade matemática de acerto das dezenas faltantes atinge seu pico máximo!
 
         ---
-        #### 🔄 1. O que é o Ciclo da Lotofácil?
-        Um **ciclo** é o período necessário para que todas as 25 dezenas sejam sorteadas ao menos uma vez.
-        * **Faltantes no Ciclo:** São os números que ainda não saíram no ciclo atual.
-        * O sistema ajusta automaticamente a quantidade ideal desses números em cada palpite.
-
-        ---
-        #### 📊 2. O que é o Score V10?
-        O **Score V10** mede a força matemática individual de cada jogo (quanto maior, melhor):
-        * **Média Padrão:** `1.1000` a `1.1500` (Jogos bem equilibrados).
-        * **Zona de Elite:** `≥ 1.1800` (Jogos com máxima convergência estatística).
+        #### 📊 O que é o Score V10?
+        O **Score V10** é o índice de força matemática de cada palpite (quanto maior, melhor):
+        * **Padrão (`1.1000 a 1.1500`):** Jogos equilibrados com alta frequência recente.
+        * **Zona de Elite (`≥ 1.1800`):** Jogos com máxima convergência entre os números quentes das últimas 30 rodadas e o fechamento do ciclo.
         """)
 
 st.divider()
