@@ -11,12 +11,14 @@ st.set_page_config(
     layout="wide"
 )
 
-# 🎨 Opcional: Esconde menus do Streamlit e barra superior para um visual mais limpo
+# 🎨 DESIGN LIMPO: Esconde o cabeçalho, botão do GitHub, Fork e menus do Streamlit
 st.markdown("""
     <style>
     #MainMenu {visibility: hidden;}
     header {visibility: hidden;}
     footer {visibility: hidden;}
+    [data-testid="stHeader"] {visibility: hidden;}
+    [data-testid="stToolbar"] {visibility: hidden;}
     </style>
     """, unsafe_allow_html=True)
 
@@ -147,7 +149,7 @@ def carregar_dados_e_calcular():
         if c['dezenas_str'] not in vistos:
             vistos.add(c['dezenas_str'])
             jogos_unicos.append(c)
-        if len(jogos_unicos) == 50:  # Guarda os top 50 jogos únicos
+        if len(jogos_unicos) == 50:
             break
 
     for idx, j in enumerate(jogos_unicos, start=1):
