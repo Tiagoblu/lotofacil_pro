@@ -3,6 +3,12 @@ import sqlite3
 import pandas as pd
 import random
 import os
+import sys
+
+# Garante que os módulos da pasta 'core' fiquem acessíveis
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+if BASE_DIR not in sys.path:
+    sys.path.insert(0, BASE_DIR)
 
 # Configuração da página
 st.set_page_config(
@@ -22,10 +28,19 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# ── CARREGAMENTO DE DADOS BLINDADO & DINÂMICO ─────────────────────────
+# ── CARREGAMENTO E AUTO-ATUALIZAÇÃO DE DADOS ─────────────────────────
 @st.cache_data(ttl=300)
 def carregar_dados_e_calcular():
-    db_path = "database/lotofacil.db"
+    # 1. TENTA AUTOMATICAMENTE SINCRONIZAR COM A API DA CAIXA
+    try:
+        from core.infrastructure.downloader.baixar import baixar_dados_novos
+        baixar_dados_novos()
+    except Exception:
+        # Se houver qualquer indisponibilidade na API da Caixa,
+        # o sistema prossegue usando a base local sem travar.
+        pass
+
+    db_path = os.path.join(BASE_DIR, "database", "lotofacil.db")
     
     if not os.path.exists(db_path):
         return None, f"Arquivo '{db_path}' não encontrado no repositório."
@@ -33,7 +48,7 @@ def carregar_dados_e_calcular():
     try:
         conn = sqlite3.connect(db_path)
         
-        # 1. Detecta as tabelas existentes no banco SQLite automaticamente
+        # Detecta as tabelas existentes no banco SQLite automaticamente
         tables_df = pd.read_sql_query("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%';", conn)
         table_names = tables_df['name'].tolist()
         
