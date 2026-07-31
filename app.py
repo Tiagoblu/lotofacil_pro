@@ -161,17 +161,16 @@ else:
         status_titulo = "✅ OPORTUNIDADE ESTATÍSTICA ATIVA"
         alerta_func = st.info
 
-    # Texto explicativo sobre a Janela de Ouro
+    # Texto explicativo com o emoji de estrela inserido no texto (⭐ Janela de Ouro)
     if janela_ouro_ativa:
-        txt_janela_ouro = "⭐ **MELHOR CHANCE CONFIRMADA:** Ciclo na reta final (≤ 4 dezenas) e Score Médio ≥ 1.1800. Ponto ideal para aposta!"
+        txt_janela_ouro = "⭐ **MELHOR CHANCE CONFIRMADA (⭐ Janela de Ouro):** Ciclo na reta final (≤ 4 dezenas) e Score Médio ≥ 1.1800. Ponto ideal para aposta!"
     else:
-        txt_janela_ouro = f"ℹ️ **Condição para a MELHOR CHANCE (Janela de Ouro):** Exige Faltantes ≤ 4 e Score V10 ≥ 1.1800 *(Score Atual dos Jogos: {score_medio_sel:.4f})*."
+        txt_janela_ouro = f"ℹ️ **Condição para a MELHOR CHANCE (⭐ Janela de Ouro):** Exige Faltantes ≤ 4 e Score V10 ≥ 1.1800 *(Score Atual dos Jogos: {score_medio_sel:.4f})*."
 
     # ── MODO PADRÃO / INICIANTE ───────────────────────────────────────
     if not modo_pro:
         st.info(f"📌 **Concurso Alvo:** {concurso_alvo} | **Último cadastrado:** {ultimo_concurso}")
         
-        # Banner do Ciclo + Explicação da Janela de Ouro
         alerta_func(f"**SITUAÇÃO DO CICLO:** {status_titulo} — {txt_dezenas}.\n\n{txt_janela_ouro}")
         
         st.markdown(f"### 📋 Sugestões de {qtd_gerar} Jogos para Hoje")
@@ -192,9 +191,8 @@ else:
         m1, m2, m3 = st.columns(3)
         m1.metric("Concurso Alvo", concurso_alvo, help="Próximo concurso a ser sorteado")
         m2.metric("Faltantes no Ciclo", f"{qtd_faltantes} de 25", help="Quantidade de dezenas restantes no ciclo")
-        m3.metric("Score Médio dos Selecionados", f"{score_medio_sel:.6f}", help="Média do Score V10 dos bilhetes exibidos (Meta para Janela de Ouro: ≥ 1.1800)")
+        m3.metric("Score Médio dos Selecionados", f"{score_medio_sel:.6f}", help="Média do Score V10 dos bilhetes exibidos (Meta para ⭐ Janela de Ouro: ≥ 1.1800)")
 
-        # Banner do Modo Pro com destaque da Janela de Ouro
         alerta_func(f"### {status_titulo}\n\n📌 **{txt_dezenas}**\n\n{txt_janela_ouro}")
         
         st.markdown(f"### 📊 Tabela Preditiva Detalhada ({qtd_gerar} Jogos)")
@@ -220,7 +218,7 @@ else:
         if janela_ouro_ativa:
             st.success("⭐ **Janela de Ouro Ativa:** Todos os critérios de máxima probabilidade foram atingidos.")
         else:
-            st.caption(f"★ **Janela de Ouro (Melhor Chance):** Requer Faltantes ≤ 4 e Score V10 ≥ 1.1800 (Score atual: **{score_medio_sel:.6f}**).")
+            st.caption(f"⭐ **Janela de Ouro (Melhor Chance):** Requer Faltantes ≤ 4 e Score V10 ≥ 1.1800 (Score atual: **{score_medio_sel:.6f}**).")
 
 st.divider()
 st.caption("© 2026 Lotofácil Pro V11 — Todos os direitos reservados.")
