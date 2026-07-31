@@ -1,4 +1,4 @@
-import streamlit as st
+	import streamlit as st
 import os
 import sys
 import pandas as pd
@@ -15,7 +15,7 @@ st.set_page_config(
     layout="wide"
 )
 
-# 🎨 DESIGN LIMPO: Esconde o cabeçalho e menus do Streamlit
+# 🎨 DESIGN LIMPO & AJUSTE DE CONTRASTE
 st.markdown("""
     <style>
     #MainMenu {visibility: hidden;}
@@ -23,6 +23,19 @@ st.markdown("""
     footer {visibility: hidden;}
     [data-testid="stHeader"] {visibility: hidden;}
     [data-testid="stToolbar"] {visibility: hidden;}
+    
+    /* Destaque legível para dezenas faltantes */
+    .badge-faltantes {
+        background-color: #2b2b11;
+        color: #ffeb3b;
+        padding: 8px 16px;
+        border-radius: 8px;
+        font-weight: bold;
+        font-size: 1.1rem;
+        border: 1px solid #fbc02d;
+        display: inline-block;
+        margin-top: 5px;
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -50,7 +63,7 @@ def executar_motor_oficial():
     ultimo = concursos[-1]
     alvo = ultimo.numero + 1
 
-    # 3. Executa o Motor Probabilístico Oficial (o mesmo do main.py)
+    # 3. Executa o Motor Probabilístico Oficial
     engine = ProbabilisticEngine()
     jogos, info = engine.gerar_jogos(concursos)
 
@@ -123,21 +136,29 @@ else:
     novo_ciclo = dados['novo_ciclo']
     score_medio_geral = dados['score_medio']
 
-    # Lógica de status exatamente idêntica ao main.py
-    if novo_ciclo or qtd_faltantes == 0:
-        status_texto = "🔄 INÍCIO DE NOVO CICLO"
-        alerta_cor = st.info
-    elif qtd_faltantes <= 4 and score_medio_geral >= 1.18:
-        status_texto = "🏆 JANELA DE OURO ATIVA — APOSTA MÁXIMA"
-        alerta_cor = st.success
-    elif qtd_faltantes <= 4:
-        status_texto = "🔥 FECHAMENTO DE CICLO PRÓXIMO"
-        alerta_cor = st.warning
+    # Formatação Gramatical das Faltantes
+    if qtd_faltantes == 1:
+        txt_dezenas = f"Falta 1 dezena: **{faltantes[0]}**"
+    elif qtd_faltantes > 1:
+        txt_dezenas = f"Faltam {qtd_faltantes} dezenas: **{', '.join(faltantes)}**"
     else:
-        status_texto = "✅ OPORTUNIDADE ESTATÍSTICA ATIVA"
-        alerta_cor = st.info
+        txt_dezenas = "Nenhuma dezena faltante (Ciclo Fechado)"
 
-    # Controles de quantidade e visualização
+    # Lógica de Status
+    if novo_ciclo or qtd_faltantes == 0:
+        status_titulo = "🔄 INÍCIO DE NOVO CICLO"
+        alerta_func = st.info
+    elif qtd_faltantes <= 4 and score_medio_geral >= 1.18:
+        status_titulo = "🏆 JANELA DE OURO ATIVA — APOSTA MÁXIMA"
+        alerta_func = st.success
+    elif qtd_faltantes <= 4:
+        status_titulo = "🔥 FECHAMENTO DE CICLO PRÓXIMO"
+        alerta_func = st.warning
+    else:
+        status_titulo = "✅ OPORTUNIDADE ESTATÍSTICA ATIVA"
+        alerta_func = st.info
+
+    # Controles
     c_ctrl1, c_ctrl2 = st.columns([3, 1])
     with c_ctrl1:
         qtd_gerar = st.slider(
@@ -157,7 +178,8 @@ else:
     if not modo_pro:
         st.info(f"📌 **Concurso Alvo:** {concurso_alvo} | **Último cadastrado:** {ultimo_concurso}")
         
-        alerta_cor(f"**SITUAÇÃO DO CICLO:** {status_texto} (Faltam {qtd_faltantes} dezenas).")
+        # Exibição clara do status e das dezenas
+        alerta_func(f"**SITUAÇÃO DO CICLO:** {status_titulo} — {txt_dezenas}.")
         
         st.markdown(f"### 📋 Sugestões de {qtd_gerar} Jogos para Hoje")
         st.caption("Escolha seus palpites e clique no código para copiar:")
@@ -174,16 +196,16 @@ else:
 
     # ── MODO AVANÇADO / PRO ───────────────────────────────────────────
     else:
-        m1, m2, m3, m4 = st.columns(4)
-        m1.metric("Concurso Alvo", concurso_alvo)
-        m2.metric("Status do Ciclo", status_texto)
-        m3.metric("Faltantes no Ciclo", f"{qtd_faltantes} de 25")
+        # Métricas limpas (sem cortar texto)
+        m1, m2, m3 = st.columns(3)
+        m1.metric("Concurso Alvo", concurso_alvo, help="Próximo concurso a ser sorteado")
+        m2.metric("Faltantes no Ciclo", f"{qtd_faltantes} de 25", help="Quantidade de dezenas restantes para o fechamento")
         
         score_medio_sel = sum(j['score'] for j in jogos_filtrados) / len(jogos_filtrados)
-        m4.metric("Score Médio dos Selecionados", f"{score_medio_sel:.6f}")
+        m3.metric("Score Médio dos Selecionados", f"{score_medio_sel:.6f}", help="Média do Score V10 dos bilhetes exibidos")
 
-        txt_faltantes = ", ".join(faltantes) if faltantes else "Nenhuma (Ciclo Fechado)"
-        st.warning(f"**Dezenas Faltantes para Fechamento:** `{txt_faltantes}`")
+        # Banner de Status + Dezenas Faltantes sem cortes
+        alerta_func(f"### {status_titulo}\n**Dezenas Faltantes para Fechamento:** `{', '.join(faltantes) if faltantes else 'Nenhuma (Ciclo Fechado)'}`")
         
         st.markdown(f"### 📊 Tabela Preditiva Detalhada ({qtd_gerar} Jogos)")
         
