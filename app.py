@@ -15,7 +15,7 @@ st.set_page_config(
     layout="wide"
 )
 
-# 🎨 DESIGN LIMPO & AJUSTE DE CONTRASTE
+# 🎨 DESIGN LIMPO
 st.markdown("""
     <style>
     #MainMenu {visibility: hidden;}
@@ -29,14 +29,12 @@ st.markdown("""
 # ── CARREGAMENTO DE DADOS & MOTOR OFICIAL ─────────────────────────────
 @st.cache_data(ttl=300)
 def executar_motor_oficial():
-    # 1. Sincroniza com a API da Caixa se o downloader estiver disponível
     try:
         from core.infrastructure.downloader.baixar import baixar_dados_novos
         baixar_dados_novos()
     except Exception:
         pass
 
-    # 2. Carrega concursos usando a infraestrutura do projeto
     try:
         from core.infrastructure.database.database import carregar_concursos
         from core.engine.probabilistic_engine import ProbabilisticEngine
@@ -50,11 +48,9 @@ def executar_motor_oficial():
     ultimo = concursos[-1]
     alvo = ultimo.numero + 1
 
-    # 3. Executa o Motor Probabilístico Oficial
     engine = ProbabilisticEngine()
     jogos, info = engine.gerar_jogos(concursos)
 
-    # Prepara lista formatada de jogos
     jogos_processados = []
     faltantes = info.get("dezenas_faltantes", [])
     novo_ciclo = info.get("novo_ciclo", False)
@@ -123,11 +119,11 @@ else:
     novo_ciclo = dados['novo_ciclo']
     score_medio_geral = dados['score_medio']
 
-    # Formatação Gramatical das Faltantes
+    # Texto padronizado de dezenas faltantes
     if qtd_faltantes == 1:
-        txt_dezenas = f"Falta 1 dezena: **{faltantes[0]}**"
+        txt_dezenas = f"Falta 1 dezena para fechamento: **{faltantes[0]}**"
     elif qtd_faltantes > 1:
-        txt_dezenas = f"Faltam {qtd_faltantes} dezenas: **{', '.join(faltantes)}**"
+        txt_dezenas = f"Faltam {qtd_faltantes} dezenas para fechamento: **{', '.join(faltantes)}**"
     else:
         txt_dezenas = "Nenhuma dezena faltante (Ciclo Fechado)"
 
@@ -161,11 +157,10 @@ else:
 
     jogos_filtrados = todos_jogos[:qtd_gerar]
 
-    # ── MODO INICIANTE / LEIGO ────────────────────────────────────────
+    # ── MODO PADRÃO ───────────────────────────────────────────────────
     if not modo_pro:
         st.info(f"📌 **Concurso Alvo:** {concurso_alvo} | **Último cadastrado:** {ultimo_concurso}")
         
-        # Exibição clara do status e das dezenas
         alerta_func(f"**SITUAÇÃO DO CICLO:** {status_titulo} — {txt_dezenas}.")
         
         st.markdown(f"### 📋 Sugestões de {qtd_gerar} Jogos para Hoje")
@@ -183,16 +178,15 @@ else:
 
     # ── MODO AVANÇADO / PRO ───────────────────────────────────────────
     else:
-        # Métricas limpas
         m1, m2, m3 = st.columns(3)
         m1.metric("Concurso Alvo", concurso_alvo, help="Próximo concurso a ser sorteado")
-        m2.metric("Faltantes no Ciclo", f"{qtd_faltantes} de 25", help="Quantidade de dezenas restantes para o fechamento")
+        m2.metric("Faltantes no Ciclo", f"{qtd_faltantes} de 25", help="Quantidade de dezenas restantes no ciclo")
         
         score_medio_sel = sum(j['score'] for j in jogos_filtrados) / len(jogos_filtrados)
         m3.metric("Score Médio dos Selecionados", f"{score_medio_sel:.6f}", help="Média do Score V10 dos bilhetes exibidos")
 
-        # Banner de Status + Dezenas Faltantes sem cortes
-        alerta_func(f"### {status_titulo}\n**Dezenas Faltantes para Fechamento:** `{', '.join(faltantes) if faltantes else 'Nenhuma (Ciclo Fechado)'}`")
+        # Banner em Destaque no Modo Pro (Idêntico em clareza ao Modo Padrão)
+        alerta_func(f"### {status_titulo}\n\n📌 **{txt_dezenas}**")
         
         st.markdown(f"### 📊 Tabela Preditiva Detalhada ({qtd_gerar} Jogos)")
         
