@@ -1,4 +1,4 @@
-	import streamlit as st
+import streamlit as st
 import os
 import sys
 import pandas as pd
@@ -23,19 +23,6 @@ st.markdown("""
     footer {visibility: hidden;}
     [data-testid="stHeader"] {visibility: hidden;}
     [data-testid="stToolbar"] {visibility: hidden;}
-    
-    /* Destaque legível para dezenas faltantes */
-    .badge-faltantes {
-        background-color: #2b2b11;
-        color: #ffeb3b;
-        padding: 8px 16px;
-        border-radius: 8px;
-        font-weight: bold;
-        font-size: 1.1rem;
-        border: 1px solid #fbc02d;
-        display: inline-block;
-        margin-top: 5px;
-    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -196,7 +183,7 @@ else:
 
     # ── MODO AVANÇADO / PRO ───────────────────────────────────────────
     else:
-        # Métricas limpas (sem cortar texto)
+        # Métricas limpas
         m1, m2, m3 = st.columns(3)
         m1.metric("Concurso Alvo", concurso_alvo, help="Próximo concurso a ser sorteado")
         m2.metric("Faltantes no Ciclo", f"{qtd_faltantes} de 25", help="Quantidade de dezenas restantes para o fechamento")
