@@ -101,7 +101,7 @@ with col_help:
         * **🔴 Etapa 3: Fechamento do Ciclo (Faltam 1 a 4 dezenas)** — Reta final com alta probabilidade de fechamento.
 
         ---
-        #### ⭐ A JANELA DE OURO (O MELHOR MOMENTO PARA APOSTAR!)
+        #### ⭐ A JANELA DE OURO (A MELHOR CHANCE / APOSTA MÁXIMA!)
         * **🎯 Requisitos:** Ciclo na **Etapa 3** (Faltando **≤ 4 dezenas**) e **Score V10 ≥ 1.1800**.
         * **🔥 Por que apostar?** Ponto de máxima convergência probabilística entre dezenas faltantes e dezenas quentes.
         """)
@@ -117,29 +117,6 @@ else:
     qtd_faltantes = dados['qtd_faltantes']
     todos_jogos = dados['jogos']
     novo_ciclo = dados['novo_ciclo']
-    score_medio_geral = dados['score_medio']
-
-    # Texto padronizado de dezenas faltantes
-    if qtd_faltantes == 1:
-        txt_dezenas = f"Falta 1 dezena para fechamento: **{faltantes[0]}**"
-    elif qtd_faltantes > 1:
-        txt_dezenas = f"Faltam {qtd_faltantes} dezenas para fechamento: **{', '.join(faltantes)}**"
-    else:
-        txt_dezenas = "Nenhuma dezena faltante (Ciclo Fechado)"
-
-    # Lógica de Status
-    if novo_ciclo or qtd_faltantes == 0:
-        status_titulo = "🔄 INÍCIO DE NOVO CICLO"
-        alerta_func = st.info
-    elif qtd_faltantes <= 4 and score_medio_geral >= 1.18:
-        status_titulo = "🏆 JANELA DE OURO ATIVA — APOSTA MÁXIMA"
-        alerta_func = st.success
-    elif qtd_faltantes <= 4:
-        status_titulo = "🔥 FECHAMENTO DE CICLO PRÓXIMO"
-        alerta_func = st.warning
-    else:
-        status_titulo = "✅ OPORTUNIDADE ESTATÍSTICA ATIVA"
-        alerta_func = st.info
 
     # Controles
     c_ctrl1, c_ctrl2 = st.columns([3, 1])
@@ -157,11 +134,45 @@ else:
 
     jogos_filtrados = todos_jogos[:qtd_gerar]
 
-    # ── MODO PADRÃO ───────────────────────────────────────────────────
+    # Score médio real dos jogos selecionados na tela
+    score_medio_sel = sum(j['score'] for j in jogos_filtrados) / len(jogos_filtrados) if jogos_filtrados else 0.0
+
+    # Texto padronizado de dezenas faltantes
+    if qtd_faltantes == 1:
+        txt_dezenas = f"Falta 1 dezena para fechamento: **{faltantes[0]}**"
+    elif qtd_faltantes > 1:
+        txt_dezenas = f"Faltam {qtd_faltantes} dezenas para fechamento: **{', '.join(faltantes)}**"
+    else:
+        txt_dezenas = "Nenhuma dezena faltante (Ciclo Fechado)"
+
+    # Lógica de Status & Janela de Ouro (Melhor Chance)
+    janela_ouro_ativa = (qtd_faltantes <= 4 and score_medio_sel >= 1.18)
+
+    if novo_ciclo or qtd_faltantes == 0:
+        status_titulo = "🔄 INÍCIO DE NOVO CICLO"
+        alerta_func = st.info
+    elif janela_ouro_ativa:
+        status_titulo = "🏆 JANELA DE OURO ATIVA — MELHOR CHANCE (APOSTA MÁXIMA)"
+        alerta_func = st.success
+    elif qtd_faltantes <= 4:
+        status_titulo = "🔥 FECHAMENTO DE CICLO PRÓXIMO"
+        alerta_func = st.warning
+    else:
+        status_titulo = "✅ OPORTUNIDADE ESTATÍSTICA ATIVA"
+        alerta_func = st.info
+
+    # Texto explicativo sobre a Janela de Ouro
+    if janela_ouro_ativa:
+        txt_janela_ouro = "⭐ **MELHOR CHANCE CONFIRMADA:** Ciclo na reta final (≤ 4 dezenas) e Score Médio ≥ 1.1800. Ponto ideal para aposta!"
+    else:
+        txt_janela_ouro = f"ℹ️ **Condição para a MELHOR CHANCE (Janela de Ouro):** Exige Faltantes ≤ 4 e Score V10 ≥ 1.1800 *(Score Atual dos Jogos: {score_medio_sel:.4f})*."
+
+    # ── MODO PADRÃO / INICIANTE ───────────────────────────────────────
     if not modo_pro:
         st.info(f"📌 **Concurso Alvo:** {concurso_alvo} | **Último cadastrado:** {ultimo_concurso}")
         
-        alerta_func(f"**SITUAÇÃO DO CICLO:** {status_titulo} — {txt_dezenas}.")
+        # Banner do Ciclo + Explicação da Janela de Ouro
+        alerta_func(f"**SITUAÇÃO DO CICLO:** {status_titulo} — {txt_dezenas}.\n\n{txt_janela_ouro}")
         
         st.markdown(f"### 📋 Sugestões de {qtd_gerar} Jogos para Hoje")
         st.caption("Escolha seus palpites e clique no código para copiar:")
@@ -181,12 +192,10 @@ else:
         m1, m2, m3 = st.columns(3)
         m1.metric("Concurso Alvo", concurso_alvo, help="Próximo concurso a ser sorteado")
         m2.metric("Faltantes no Ciclo", f"{qtd_faltantes} de 25", help="Quantidade de dezenas restantes no ciclo")
-        
-        score_medio_sel = sum(j['score'] for j in jogos_filtrados) / len(jogos_filtrados)
-        m3.metric("Score Médio dos Selecionados", f"{score_medio_sel:.6f}", help="Média do Score V10 dos bilhetes exibidos")
+        m3.metric("Score Médio dos Selecionados", f"{score_medio_sel:.6f}", help="Média do Score V10 dos bilhetes exibidos (Meta para Janela de Ouro: ≥ 1.1800)")
 
-        # Banner em Destaque no Modo Pro (Idêntico em clareza ao Modo Padrão)
-        alerta_func(f"### {status_titulo}\n\n📌 **{txt_dezenas}**")
+        # Banner do Modo Pro com destaque da Janela de Ouro
+        alerta_func(f"### {status_titulo}\n\n📌 **{txt_dezenas}**\n\n{txt_janela_ouro}")
         
         st.markdown(f"### 📊 Tabela Preditiva Detalhada ({qtd_gerar} Jogos)")
         
@@ -208,7 +217,10 @@ else:
             hide_index=True
         )
         
-        st.caption("★ **Janela de Ouro:** Exige Faltantes ≤ 4 e Score V10 ≥ 1.18.")
+        if janela_ouro_ativa:
+            st.success("⭐ **Janela de Ouro Ativa:** Todos os critérios de máxima probabilidade foram atingidos.")
+        else:
+            st.caption(f"★ **Janela de Ouro (Melhor Chance):** Requer Faltantes ≤ 4 e Score V10 ≥ 1.1800 (Score atual: **{score_medio_sel:.6f}**).")
 
 st.divider()
 st.caption("© 2026 Lotofácil Pro V11 — Todos os direitos reservados.")
