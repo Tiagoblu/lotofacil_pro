@@ -105,7 +105,8 @@ def gerar_apostas_v10(qtd_desejada=50, usar_diversidade=True, simular_janela=Fal
         "jogos": jogos_selecionados,
         "freqs_dict": frequencias,
         "dezenas_faltantes": dezenas_faltantes,
-        "ultimo_resultado_base": ultimo_res
+        "ultimo_resultado_base": ultimo_res,
+        "simulado": simular_janela
     }
 
 # -----------------------------------------------------------------------------
@@ -134,6 +135,20 @@ modo_simulacao = st.sidebar.checkbox(
     value=False,
     help="Ative para testar como o painel responde quando restam apenas 3 dezenas no ciclo."
 )
+
+# Reação instantânea do simulador ao marcar/desmarcar a caixa de seleção
+if modo_simulacao:
+    st.session_state['dados_gerados'] = gerar_apostas_v10(
+        qtd_desejada=qtd_apostas,
+        usar_diversidade=ativar_diversidade,
+        simular_janela=True
+    )
+elif st.session_state['dados_gerados'] is not None and st.session_state['dados_gerados'].get('simulado') is True:
+    st.session_state['dados_gerados'] = gerar_apostas_v10(
+        qtd_desejada=qtd_apostas,
+        usar_diversidade=ativar_diversidade,
+        simular_janela=False
+    )
 
 st.sidebar.write("")
 st.sidebar.markdown("**Último resultado base:**")
