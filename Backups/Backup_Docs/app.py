@@ -12,7 +12,7 @@ st.set_page_config(
     layout="wide"
 )
 
-# Estilo CSS para manter o layout limpo e ocultar elementos nativos do Streamlit
+# Estilo CSS para ocultar menus padrões do Streamlit e manter o visual limpo
 st.markdown("""
     <style>
     #MainMenu {visibility: hidden;}
@@ -29,10 +29,15 @@ PRIMOS = {2, 3, 5, 7, 11, 13, 17, 19, 23}
 # -----------------------------------------------------------------------------
 # Motor Preditivo V10 & Algoritmo de Controle de Diversidade
 # -----------------------------------------------------------------------------
-def gerar_apostas_v10(qtd_desejada=50, usar_diversidade=True):
-    # Resultado base do último concurso cadastrado
-    ultimo_res = [1, 2, 3, 5, 6, 7, 9, 10, 11, 13, 16, 18, 22, 23, 25]
-    faltantes = [4, 8, 12, 14, 15, 17, 19, 20, 21, 24]
+def gerar_apostas_v10(qtd_desejada=50, usar_diversidade=True, simular_janela=False):
+    if simular_janela:
+        # Cenário de Simulação: Apenas 3 dezenas faltantes (Gatilho da Janela de Ouro)
+        dezenas_faltantes = [4, 14, 20]
+        ultimo_res = [1, 2, 3, 5, 6, 7, 8, 9, 10, 11, 12, 13, 15, 16, 17, 18, 19, 21, 22, 23, 24, 25]
+    else:
+        # Cenário Real Padrão
+        dezenas_faltantes = [4, 8, 12, 14, 15, 17, 19, 20, 21, 24]
+        ultimo_res = [1, 2, 3, 5, 6, 7, 9, 10, 11, 13, 16, 18, 22, 23, 25]
     
     # Pool estocástico de candidatos filtrados pelo V10
     candidatos = []
@@ -47,14 +52,12 @@ def gerar_apostas_v10(qtd_desejada=50, usar_diversidade=True):
             score = round(1.20 + random.uniform(0.05, 0.25), 6)
             candidatos.append((jogo, score, rep))
             
-    # Ordena candidatos por pontuação bruta do Score V10
     candidatos = sorted(candidatos, key=lambda x: x[1], reverse=True)
     
     jogos_selecionados = []
     frequencias = Counter()
     
     if not usar_diversidade:
-        # Seleção direta top-N sem diversificação
         for idx, (j, score, rep) in enumerate(candidatos[:qtd_desejada], 1):
             jogos_selecionados.append({
                 "id": idx,
@@ -65,7 +68,7 @@ def gerar_apostas_v10(qtd_desejada=50, usar_diversidade=True):
             })
             frequencias.update(j)
     else:
-        # Algoritmo de Diversidade: Penaliza a seleção de dezenas com frequência excessiva
+        # Algoritmo de Diversidade: Previne concentrar as mesmas dezenas em lotes de até 100 jogos
         limite_frequencia_ideal = (qtd_desejada * 15 / 25) * 1.30
         candidatos_pool = candidatos.copy()
         
@@ -75,7 +78,6 @@ def gerar_apostas_v10(qtd_desejada=50, usar_diversidade=True):
             
             for cand in candidatos_pool:
                 j, score, rep = cand
-                # Calcula penalidade para cada dezena acima da média ideal de distribuição
                 penalidade = sum(0.025 for d in j if frequencias[d] > limite_frequencia_ideal)
                 score_ajustado = score - penalidade
                 
@@ -95,7 +97,7 @@ def gerar_apostas_v10(qtd_desejada=50, usar_diversidade=True):
                 })
                 frequencias.update(j)
                 
-    return jogos_selecionados, frequencias, faltantes, ultimo_res
+    return jogos_selecionados, frequencias, dezenas_faltantes, ultimo_res
 
 # -----------------------------------------------------------------------------
 # Barra Lateral (Sidebar) - Parâmetros e Filtros de Geração
@@ -113,7 +115,15 @@ qtd_apostas = st.sidebar.number_input(
 ativar_diversidade = st.sidebar.checkbox(
     "Ativar Controle de Diversidade",
     value=True,
-    help="Equilibra a distribuição das 25 dezenas no lote gerado para evitar a repetição viciada dos mesmos números ao apostar em alto volume (até 100 jogos)."
+    help="Equilibra a distribuição das 25 dezenas no lote gerado para evitar a repetição viciada dos mesmos números ao apostar em alto volume."
+)
+
+st.sidebar.divider()
+st.sidebar.markdown("### 🧪 Teste de Cenários")
+modo_simulacao = st.sidebar.checkbox(
+    "Simular 'Janela de Ouro'",
+    value=False,
+    help="Ative para testar como o painel responde quando restam apenas 3 dezenas no ciclo."
 )
 
 st.sidebar.write("")
@@ -127,7 +137,8 @@ btn_gerar = st.sidebar.button("🚀 Gerar Apostas V10", use_container_width=True
 # Execute a geração dos jogos
 jogos, freqs_dict, dezenas_faltantes, ultimo_resultado_base = gerar_apostas_v10(
     qtd_desejada=qtd_apostas,
-    usar_diversidade=ativar_diversidade
+    usar_diversidade=ativar_diversidade,
+    simular_janela=modo_simulacao
 )
 
 # -----------------------------------------------------------------------------
@@ -261,6 +272,6 @@ for d in range(1, 26):
 
 df_distrib = pd.DataFrame(dados_distribuicao).T
 df_distrib.columns = [f"{i:02d}" for i in range(1, 26)]
-df_distrib = df_distrib.iloc[1:]  # Exibe Frequência e Porcentagem
+df_distrib = df_distrib.iloc[1:]
 
 st.dataframe(df_distrib, use_container_width=True)
