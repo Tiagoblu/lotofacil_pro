@@ -1,287 +1,224 @@
 import streamlit as st
-import pandas as pd
-import random
 import os
-from datetime import datetime
+import sys
+import pandas as pd
 
-# -----------------------------------------------------------------------------
-# Configuração Inicial da Página Streamlit
-# -----------------------------------------------------------------------------
+# Configura diretório base para importação dos módulos do 'core'
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+if BASE_DIR not in sys.path:
+    sys.path.insert(0, BASE_DIR)
+
+# Configuração da página
 st.set_page_config(
-    page_title="Lotofácil Pro V10 🎯",
-    page_icon="🎯",
+    page_title="Lotofácil Pro V11", 
+    page_icon="🎯", 
     layout="wide"
 )
 
-PRIMOS = {2, 3, 5, 7, 11, 13, 17, 19, 23}
+# 🎨 DESIGN LIMPO
+st.markdown("""
+    <style>
+    #MainMenu {visibility: hidden;}
+    header {visibility: hidden;}
+    footer {visibility: hidden;}
+    [data-testid="stHeader"] {visibility: hidden;}
+    [data-testid="stToolbar"] {visibility: hidden;}
+    </style>
+    """, unsafe_allow_html=True)
 
-# -----------------------------------------------------------------------------
-# Funções Auxiliares e Algoritmo V10
-# -----------------------------------------------------------------------------
-def carregar_ultimo_resultado(caminho_historico="historico_v10.txt"):
-    """Carrega o último concurso cadastrado no arquivo de histórico."""
-    if not os.path.exists(caminho_historico):
-        return [3, 4, 5, 6, 7, 8, 10, 11, 13, 14, 16, 18, 19, 21, 25]
-    
-    ultimo_resultado = []
+# ── CARREGAMENTO DE DADOS & MOTOR OFICIAL ─────────────────────────────
+@st.cache_data(ttl=300)
+def executar_motor_oficial():
     try:
-        with open(caminho_historico, "r", encoding="utf-8", errors="ignore") as f:
-            linhas = f.readlines()
-            for linha in reversed(linhas):
-                if "Resultado:" in linha:
-                    partes = linha.split("Resultado:")[1].strip().split()
-                    ultimo_resultado = [int(x) for x in partes]
-                    break
+        from core.infrastructure.downloader.baixar import baixar_dados_novos
+        baixar_dados_novos()
     except Exception:
         pass
-        
-    return ultimo_resultado if len(ultimo_resultado) == 15 else [3, 4, 5, 6, 7, 8, 10, 11, 13, 14, 16, 18, 19, 21, 25]
 
-def calcular_score_v10(jogo, ultimo_resultado):
-    """Calcula a pontuação V10 baseada nos padrões estatísticos do jogo."""
-    repeticoes = len(set(jogo) & set(ultimo_resultado))
-    pares = sum(1 for d in jogo if d % 2 == 0)
-    primos = sum(1 for d in jogo if d in PRIMOS)
-    soma = sum(jogo)
-    
-    score = 1.0
-    
-    # Repetição do concurso anterior (faixa de alta probabilidade: 8, 9 ou 10)
-    if repeticoes in [8, 9, 10]:
-        score += 0.15
-    elif repeticoes in [7, 11]:
-        score += 0.05
-    else:
-        score -= 0.20
-        
-    # Equilíbrio de Pares e Ímpares (faixa de ouro: 7 ou 8 pares)
-    if pares in [7, 8]:
-        score += 0.10
-    elif pares in [6, 9]:
-        score += 0.03
-        
-    # Números Primos (faixa ideal: 5 ou 6 primos)
-    if primos in [5, 6]:
-        score += 0.08
-        
-    # Faixa da Soma Total das Dezenas (ideal: 180 a 220)
-    if 180 <= soma <= 220:
-        score += 0.07
-        
-    return round(score, 6), repeticoes, pares, primos, soma
-
-def gerar_apostas_v10(qtd_solicitada, ultimo_resultado, controle_diversidade=True):
-    """Gera até 100 apostas otimizadas aplicando filtros V10 e trava de diversidade."""
-    apostas = []
-    jogos_set = set()
-    freq_dezenas = {i: 0 for i in range(1, 26)}
-    
-    max_tentativas = 250000
-    tentativas = 0
-    
-    teto_frequencia = int(qtd_solicitada * 0.72) + 2 if controle_diversidade and qtd_solicitada >= 10 else qtd_solicitada
-    
-    while len(apostas) < qtd_solicitada and tentativas < max_tentativas:
-        tentativas += 1
-        candidato = tuple(sorted(random.sample(range(1, 26), 15)))
-        
-        if candidato in jogos_set:
-            continue
-            
-        score, repeticoes, pares, primos, soma = calcular_score_v10(candidato, ultimo_resultado)
-        
-        if score < 0.95:
-            continue
-            
-        if controle_diversidade and len(apostas) >= 5:
-            excede_teto = any(freq_dezenas[d] >= teto_frequencia for d in candidato)
-            if excede_teto and random.random() < 0.85:
-                continue
-                
-        jogos_set.add(candidato)
-        for d in candidato:
-            freq_dezenas[d] += 1
-            
-        apostas.append({
-            "Dezenas_Tuple": candidato,
-            "Dezenas Sugeridas (15 números)": " ".join(f"{d:02d}" for d in candidato),
-            "Score V10": score,
-            "Repetições": repeticoes,
-            "Pares": pares,
-            "Primos": primos,
-            "Soma": soma
-        })
-        
-    apostas = sorted(apostas, key=lambda x: x["Score V10"], reverse=True)
-    for idx, item in enumerate(apostas, 1):
-        item["ID"] = idx
-        
-    return apostas, freq_dezenas
-
-def salvar_historico_v10(apostas, caminho_historico="historico_v10.txt"):
-    """Salva a geração de jogos no arquivo de histórico."""
-    agora = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-    bloco = ["\n--------------------------------------------------------------------------------"]
-    bloco.append(f"Execução em: {agora}")
-    bloco.append("Sugestões para o Concurso Alvo: Lotofácil Pro V10")
-    bloco.append("")
-    
-    for item in apostas:
-        bloco.append(f"Jogo {item['ID']}: {item['Dezenas Sugeridas (15 números)']}")
-        bloco.append(f"  Score V10             : {item['Score V10']:.6f}")
-        bloco.append(f"  Repetições Anteriores : {item['Repetições']}")
-        bloco.append("")
-        
     try:
-        with open(caminho_historico, "a", encoding="utf-8") as f:
-            f.write("\n".join(bloco) + "\n")
-    except Exception as e:
-        st.warning(f"⚠️ Não foi possível atualizar o histórico local: {e}")
+        from core.infrastructure.database.database import carregar_concursos
+        from core.engine.probabilistic_engine import ProbabilisticEngine
+    except ImportError as e:
+        return None, f"Erro ao importar módulos do 'core': {e}"
 
-# -----------------------------------------------------------------------------
-# Interface Principal (Streamlit UI)
-# -----------------------------------------------------------------------------
-st.title("🎯 Lotofácil Pro - Gerador Inteligente V10")
-st.markdown("🔥 **Ferramenta de análise estatística, filtragem matemática e geração de jogos otimizados.**")
+    concursos = carregar_concursos()
+    if not concursos:
+        return None, "Base de dados vazia ou indisponível."
 
-ultimo_resultado = carregar_ultimo_resultado()
+    ultimo = concursos[-1]
+    alvo = ultimo.numero + 1
 
-# =============================================================================
-# JANELAS INFORMATIVAS E INDICADOR DE MELHOR OPORTUNIDADE
-# =============================================================================
+    engine = ProbabilisticEngine()
+    jogos, info = engine.gerar_jogos(concursos)
 
-with st.expander("🔥 JANELA ESPECIAL: Quando é a Melhor Oportunidade para Apostar? 💰", expanded=True):
-    st.markdown("""
-    ### 🟢 Oportunidades de Alto Valor (Sinal Verde para Apostar):
-    
-    1. **🏆 Concursos Acumulados ou Especiais:**
-       * Quando o prêmio acumulado ultrapassa a média regular ou em concursos de final 0. O retorno do investimento se torna proporcionalmente superior ao risco estatístico.
-       
-    2. **🔄 Efeito Pêndulo (Anomalia no Concurso Anterior):**
-       * Quando o último concurso teve uma **anomalia de repetição** (repetiu apenas 5 ou 6 dezenas, ou repetiu 12 ou 13 dezenas). Estatisticamente, o concurso seguinte tende fortemente a retornar para o **centro da curva (8, 9 ou 10 repetidas)**, tornando as apostas geradas pelo V10 extremamente precisas.
-       
-    3. **⭐ Lote com Score V10 Médio Alto (>= 1.25):**
-       * Ao gerar seu lote de apostas, observe a métrica **Score V10 Médio**. Quando a média do lote fica acima de **1.2500**, significa que o gerador encontrou combinações de altíssima convergência (Pares, Primos, Soma e Repetição alinhados em perfeita simetria).
-       
-    4. **📊 Distribuição Homogênea no Controle de Diversidade:**
-       * Quando você gera um lote grande (ex: 30 a 100 apostas) com o **Controle de Diversidade Ativado** e todas as dezenas de 01 a 25 ficam com presença equilibrada entre 50% e 70%. Isso garante cobertura ampla da matriz sem desperdício de jogos repetidos.
+    jogos_processados = []
+    faltantes = info.get("dezenas_faltantes", [])
+    novo_ciclo = info.get("novo_ciclo", False)
 
-    ---
-    🔴 **Quando EVITAR apostar alto:** Quando o resultado anterior for absurdamente atípico e você estiver jogando sem filtros estatísticos. O V10 elimina esses cenários ruins automaticamente.
-    """)
-
-with st.expander("📖 Janela 1: Como Funciona o Algoritmo V10 e os Filtros Estatísticos ⚙️", expanded=False):
-    st.markdown("""
-    O **Algoritmo V10** analisa milhares de combinações possíveis e calcula o **Score V10** de cada jogo com base nas leis de probabilidade da Lotofácil:
-    
-    * **🔁 Repetição do Concurso Anterior (Peso 0.15):** Cerca de 60% dos sorteios repetem **8, 9 ou 10 dezenas** do resultado imediatamente anterior.
-    * **⚖️ Equilíbrio Par / Ímpar (Peso 0.10):** A maior frequência histórica ocorre com **7 Pares / 8 Ímpares** ou **8 Pares / 7 Ímpares**.
-    * **🔢 Números Primos (Peso 0.08):** Os números primos da Lotofácil são **(02, 03, 05, 07, 11, 13, 17, 19, 23)**. O algoritmo foca em apostas com **5 ou 6 primos**.
-    * **🧮 Faixa da Soma Total (Peso 0.07):** A soma das 15 dezenas sorteadas quase sempre se posiciona entre **180 e 220**.
-    """)
-
-with st.expander("🪟 Janela 2: Guia de Recursos e Controle de Diversidade 🛡️", expanded=False):
-    st.markdown("""
-    * **⚙️ Painel Lateral:** Selecione a quantidade de jogos desejada (1 a 100) e ative a trava de diversidade.
-    * **🛡️ Controle de Diversidade:** Evita a "superconcentração" em poucos números. Limita o teto de aparição das dezenas para distribuir o risco do lote por todo o volante (01 a 25).
-    * **📊 Tabela de Frequência:** Mostra exatamente quantas vezes e em qual porcentagem cada dezena aparece na sua cartela total de jogos.
-    * **📥 Exportação Rápida:** Baixe suas apostas prontas em formato CSV com um único clique.
-    """)
-
-with st.expander("💡 Janela 3: Instruções Passo a Passo para Jogar 📝", expanded=False):
-    st.markdown("""
-    1. ⚙️ Defina a quantidade de apostas no painel à esquerda (ex: **30, 50 ou 100 apostas**).
-    2. 🚀 Clique no botão **🚀 Gerar Apostas V10**.
-    3. 🏆 Analise os cartões de métricas (**Score V10 Médio** e **Repetição Média**).
-    4. 📥 Clique em **📥 Baixar Arquivo CSV das Apostas** para salvar no seu computador ou celular.
-    5. 📌 O histórico local (`historico_v10.txt`) é alimentado automaticamente a cada geração.
-    """)
-
-st.markdown("---")
-
-# -----------------------------------------------------------------------------
-# Barra Lateral (Configurações e Parâmetros)
-# -----------------------------------------------------------------------------
-st.sidebar.header("⚙️ Parâmetros do Lote")
-
-qtd_apostas = st.sidebar.number_input(
-    "🎲 Quantidade de apostas (1 a 100):",
-    min_value=1,
-    max_value=100,
-    value=30,
-    step=1
-)
-
-aplicar_diversidade = st.sidebar.checkbox(
-    "🛡️ Ativar Controle de Diversidade",
-    value=True,
-    help="Equilibra a aparição dos números de 01 a 25 para evitar dependência excessiva de poucas dezenas."
-)
-
-st.sidebar.markdown("---")
-st.sidebar.markdown(f"📌 **Último Resultado Cadastrado:**\n`{' '.join(f'{d:02d}' for d in ultimo_resultado)}`")
-
-# -----------------------------------------------------------------------------
-# Ação Principal
-# -----------------------------------------------------------------------------
-if st.sidebar.button("🚀 Gerar Apostas V10", use_container_width=True):
-    with st.spinner("⏳ Processando e aplicando filtros matemáticos V10..."):
-        apostas, frequencias = gerar_apostas_v10(qtd_apostas, ultimo_resultado, aplicar_diversidade)
+    for idx, (jogo_obj, score, rep) in enumerate(jogos, start=1):
+        dezenas_ordenadas = sorted(list(jogo_obj.dezenas))
+        dezenas_str = " ".join([f"{d:02d}" for d in dezenas_ordenadas])
         
-        df_exibicao = pd.DataFrame(apostas)[["ID", "Dezenas Sugeridas (15 números)", "Score V10", "Repetições", "Pares", "Primos", "Soma"]]
-        
-        salvar_historico_v10(apostas)
-        
-        # Dashboard de Métricas
-        col1, col2, col3, col4 = st.columns(4)
-        col1.metric("🎲 Total de Apostas", len(apostas))
-        col2.metric("⭐ Score V10 Médio", f"{df_exibicao['Score V10'].mean():.4f}")
-        col3.metric("🔄 Repetição Média", f"{df_exibicao['Repetições'].mean():.1f}")
-        col4.metric("🧮 Soma Média", f"{int(df_exibicao['Soma'].mean())}")
-        
-        st.markdown("---")
-        
-        # Tabela Principal de Resultados
-        st.subheader("🏆 Cartela de Apostas Otimizadas V10")
-        st.dataframe(
-            df_exibicao,
-            use_container_width=True,
-            hide_index=True,
-            column_config={
-                "ID": st.column_config.NumberColumn("🆔 ID", width="small"),
-                "Dezenas Sugeridas (15 números)": st.column_config.TextColumn("🎯 Dezenas Sugeridas (15 números)", width="large"),
-                "Score V10": st.column_config.NumberColumn("⭐ Score V10", format="%.6f"),
-                "Repetições": st.column_config.NumberColumn("🔄 Repetições"),
-                "Pares": st.column_config.NumberColumn("⚖️ Pares"),
-                "Primos": st.column_config.NumberColumn("🔢 Primos"),
-                "Soma": st.column_config.NumberColumn("🧮 Soma Total"),
-            }
-        )
-        
-        # Exportação CSV
-        timestamp = datetime.now().strftime("%Y-%m-%dT%H-%M")
-        nome_arquivo = f"{timestamp}_apostas_v10.csv"
-        csv_data = df_exibicao[["ID", "Dezenas Sugeridas (15 números)", "Score V10", "Repetições"]].to_csv(index=False).encode('utf-8')
-        
-        st.download_button(
-            label="📥 Baixar Arquivo CSV das Apostas",
-            data=csv_data,
-            file_name=nome_arquivo,
-            mime="text/csv",
-            use_container_width=True
-        )
-        
-        # Análise Visual de Frequência das Dezenas
-        st.markdown("---")
-        st.subheader("📊 Frequência e Cobertura das Dezenas (01 a 25)")
-        
-        df_freq = pd.DataFrame({
-            "Dezena": [f"Nº {i:02d}" for i in range(1, 26)],
-            "Aparições": [frequencias[i] for i in range(1, 26)],
-            "Presença (%)": [f"{round((frequencias[i] / len(apostas)) * 100, 1)}%" for i in range(1, 26)]
+        jogos_processados.append({
+            "id": f"{idx:02d}",
+            "dezenas_lista": dezenas_ordenadas,
+            "dezenas_str": dezenas_str,
+            "score": score,
+            "rep": rep
         })
+
+    return {
+        "ultimo_concurso": ultimo.numero,
+        "ultimo_data": ultimo.data,
+        "concurso_alvo": alvo,
+        "faltantes": [f"{d:02d}" for d in faltantes],
+        "qtd_faltantes": len(faltantes),
+        "novo_ciclo": novo_ciclo,
+        "score_medio": info.get("score_medio", 0.0),
+        "jogos": jogos_processados
+    }, None
+
+# ── EXECUÇÃO E INTERFACE STREAMLIT ────────────────────────────────────
+dados, erro = executar_motor_oficial()
+
+# Cabeçalho Principal e Botão de Ajuda
+col_title, col_help = st.columns([3, 1])
+with col_title:
+    st.title("🎯 Lotofácil Pro V11")
+    st.caption("Sistema de Análise Preditiva & Inteligência Estatística")
+
+with col_help:
+    st.write("") 
+    with st.popover("ℹ️ Como Funciona, Etapas e Ciclos"):
+        st.markdown("### 📘 Guia Completo: Etapas, Ciclos & Janela de Ouro")
+        st.markdown("""
+        O **Lotofácil Pro V11** opera identificando a maturidade dos ciclos e a força estatística das dezenas.
+
+        ---
+        #### 🔄 As 3 Etapas do Ciclo
+        * **🟢 Etapa 1: Início do Ciclo (Faltam 10 a 25 dezenas)** — Observação e reajuste inicial.
+        * **🟡 Etapa 2: Maturação (Faltam 5 a 9 dezenas)** — Afunilamento das dezenas quentes.
+        * **🔴 Etapa 3: Fechamento do Ciclo (Faltam 1 a 4 dezenas)** — Reta final com alta probabilidade de fechamento.
+
+        ---
+        #### ⭐ A JANELA DE OURO (A MELHOR CHANCE / APOSTA MÁXIMA!)
+        * **🎯 Requisitos:** Ciclo na **Etapa 3** (Faltando **≤ 4 dezenas**) e **Score V10 ≥ 1.1800**.
+        * **🔥 Por que apostar?** Ponto de máxima convergência probabilística entre dezenas faltantes e dezenas quentes.
+        """)
+
+st.divider()
+
+if erro:
+    st.error(f"⚠️ {erro}")
+else:
+    concurso_alvo = f"#{dados['concurso_alvo']}"
+    ultimo_concurso = f"#{dados['ultimo_concurso']} ({dados['ultimo_data']})"
+    faltantes = dados['faltantes']
+    qtd_faltantes = dados['qtd_faltantes']
+    todos_jogos = dados['jogos']
+    novo_ciclo = dados['novo_ciclo']
+
+    # Controles
+    c_ctrl1, c_ctrl2 = st.columns([3, 1])
+    with c_ctrl1:
+        qtd_gerar = st.slider(
+            "🎲 Quantidade de Jogos Desejada:", 
+            min_value=5, 
+            max_value=30, 
+            value=5, 
+            step=5
+        )
+    with c_ctrl2:
+        st.write("")
+        modo_pro = st.toggle("⚙️ Modo Avançado / Pro", value=False)
+
+    jogos_filtrados = todos_jogos[:qtd_gerar]
+
+    # Score médio real dos jogos selecionados na tela
+    score_medio_sel = sum(j['score'] for j in jogos_filtrados) / len(jogos_filtrados) if jogos_filtrados else 0.0
+
+    # Texto padronizado de dezenas faltantes
+    if qtd_faltantes == 1:
+        txt_dezenas = f"Falta 1 dezena para fechamento: **{faltantes[0]}**"
+    elif qtd_faltantes > 1:
+        txt_dezenas = f"Faltam {qtd_faltantes} dezenas para fechamento: **{', '.join(faltantes)}**"
+    else:
+        txt_dezenas = "Nenhuma dezena faltante (Ciclo Fechado)"
+
+    # Lógica de Status & Janela de Ouro (Melhor Chance)
+    janela_ouro_ativa = (qtd_faltantes <= 4 and score_medio_sel >= 1.18)
+
+    if novo_ciclo or qtd_faltantes == 0:
+        status_titulo = "🔄 INÍCIO DE NOVO CICLO"
+        alerta_func = st.info
+    elif janela_ouro_ativa:
+        status_titulo = "🏆 JANELA DE OURO ATIVA — MELHOR CHANCE (APOSTA MÁXIMA)"
+        alerta_func = st.success
+    elif qtd_faltantes <= 4:
+        status_titulo = "🔥 FECHAMENTO DE CICLO PRÓXIMO"
+        alerta_func = st.warning
+    else:
+        status_titulo = "✅ OPORTUNIDADE ESTATÍSTICA ATIVA"
+        alerta_func = st.info
+
+    # Texto explicativo com o emoji de estrela inserido no texto (⭐ Janela de Ouro)
+    if janela_ouro_ativa:
+        txt_janela_ouro = "⭐ **MELHOR CHANCE CONFIRMADA (⭐ Janela de Ouro):** Ciclo na reta final (≤ 4 dezenas) e Score Médio ≥ 1.1800. Ponto ideal para aposta!"
+    else:
+        txt_janela_ouro = f"ℹ️ **Condição para a MELHOR CHANCE (⭐ Janela de Ouro):** Exige Faltantes ≤ 4 e Score V10 ≥ 1.1800 *(Score Atual dos Jogos: {score_medio_sel:.4f})*."
+
+    # ── MODO PADRÃO / INICIANTE ───────────────────────────────────────
+    if not modo_pro:
+        st.info(f"📌 **Concurso Alvo:** {concurso_alvo} | **Último cadastrado:** {ultimo_concurso}")
+        
+        alerta_func(f"**SITUAÇÃO DO CICLO:** {status_titulo} — {txt_dezenas}.\n\n{txt_janela_ouro}")
+        
+        st.markdown(f"### 📋 Sugestões de {qtd_gerar} Jogos para Hoje")
+        st.caption("Escolha seus palpites e clique no código para copiar:")
+        
+        for jogo in jogos_filtrados:
+            with st.container(border=True):
+                col_a, col_b = st.columns([4, 1])
+                with col_a:
+                    st.markdown(f"**Jogo #{jogo['id']}**")
+                    st.code(jogo['dezenas_str'], language=None)
+                with col_b:
+                    st.caption("Score V10:")
+                    st.write(f"**{jogo['score']:.6f}**")
+
+    # ── MODO AVANÇADO / PRO ───────────────────────────────────────────
+    else:
+        m1, m2, m3 = st.columns(3)
+        m1.metric("Concurso Alvo", concurso_alvo, help="Próximo concurso a ser sorteado")
+        m2.metric("Faltantes no Ciclo", f"{qtd_faltantes} de 25", help="Quantidade de dezenas restantes no ciclo")
+        m3.metric("Score Médio dos Selecionados", f"{score_medio_sel:.6f}", help="Média do Score V10 dos bilhetes exibidos (Meta para ⭐ Janela de Ouro: ≥ 1.1800)")
+
+        alerta_func(f"### {status_titulo}\n\n📌 **{txt_dezenas}**\n\n{txt_janela_ouro}")
+        
+        st.markdown(f"### 📊 Tabela Preditiva Detalhada ({qtd_gerar} Jogos)")
+        
+        df_tabela = pd.DataFrame([
+            {
+                "ID": j['id'],
+                "Dezenas Sugeridas (15 números)": j['dezenas_str'],
+                "Score V10": j['score'],
+                "Repetições": j['rep']
+            } for j in jogos_filtrados
+        ])
         
         st.dataframe(
-            df_freq.T,
-            use_container_width=True
+            df_tabela,
+            column_config={
+                "Score V10": st.column_config.NumberColumn(format="%.6f")
+            },
+            use_container_width=True,
+            hide_index=True
         )
+        
+        if janela_ouro_ativa:
+            st.success("⭐ **Janela de Ouro Ativa:** Todos os critérios de máxima probabilidade foram atingidos.")
+        else:
+            st.caption(f"⭐ **Janela de Ouro (Melhor Chance):** Requer Faltantes ≤ 4 e Score V10 ≥ 1.1800 (Score atual: **{score_medio_sel:.6f}**).")
+
+st.divider()
+st.caption("© 2026 Lotofácil Pro V11 — Todos os direitos reservados.")
