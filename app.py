@@ -3,47 +3,26 @@ import pandas as pd
 import random
 from collections import Counter
 
-# -----------------------------------------------------------------------------
-# Configuração da Página e Estilo Dashboard Dark
-# -----------------------------------------------------------------------------
+# Configuração inicial da página
 st.set_page_config(
     page_title="Lotofácil Pro - Gerador de Apostas V10",
     page_icon="🎯",
     layout="wide"
 )
 
-# Estilo CSS para ocultar menus padrões do Streamlit e manter o visual limpo
-st.markdown("""
-    <style>
-    #MainMenu {visibility: hidden;}
-    header {visibility: hidden;}
-    footer {visibility: hidden;}
-    [data-testid="stHeader"] {visibility: hidden;}
-    [data-testid="stToolbar"] {visibility: hidden;}
-    .stCodeBlock {background-color: #1e222d !important;}
-    </style>
-""", unsafe_allow_html=True)
-
+# Constantes e Resultado Base
 PRIMOS = {2, 3, 5, 7, 11, 13, 17, 19, 23}
+ULTIMO_RESULTADO_DEFAULT = [1, 2, 3, 5, 6, 7, 9, 10, 11, 13, 16, 18, 22, 23, 25]
 
-# Inicialização da Session State para armazenar/limpar os jogos na memória da sessão
-if 'dados_gerados' not in st.session_state:
-    st.session_state['dados_gerados'] = None
-
-# -----------------------------------------------------------------------------
-# Motor Preditivo V10 & Algoritmo de Controle de Diversidade
-# -----------------------------------------------------------------------------
+# Função Geradora V10
 def gerar_apostas_v10(qtd_desejada=50, usar_diversidade=True, simular_janela=False):
+    ultimo_res = ULTIMO_RESULTADO_DEFAULT
+
     if simular_janela:
-        # Cenário de Simulação: Apenas 3 dezenas faltantes (Gatilho da Janela de Ouro)
         dezenas_faltantes = [4, 14, 20]
-        ultimo_res = [1, 2, 3, 5, 6, 7, 8, 9, 10, 11, 12, 13, 15, 16, 17, 18, 19, 21, 22, 23, 24, 25]
     else:
-        # Cenário Real Padrão
         dezenas_faltantes = [4, 8, 12, 14, 15, 17, 19, 20, 21, 24]
-        ultimo_res = [1, 2, 3, 5, 6, 7, 9, 10, 11, 13, 16, 18, 22, 23, 25]
     
-    # Pool estocástico de candidatos filtrados pelo V10
     candidatos = []
     random.seed(42)
     for _ in range(3000):
@@ -51,7 +30,6 @@ def gerar_apostas_v10(qtd_desejada=50, usar_diversidade=True, simular_janela=Fal
         rep = len(set(jogo) & set(ultimo_res))
         primos_cnt = len(set(jogo) & PRIMOS)
         
-        # Filtros de Otimização V10 (Primos de 4 a 7 e Repetição de 8 a 11)
         if 4 <= primos_cnt <= 7 and 8 <= rep <= 11:
             score = round(1.20 + random.uniform(0.05, 0.25), 6)
             candidatos.append((jogo, score, rep))
@@ -64,15 +42,14 @@ def gerar_apostas_v10(qtd_desejada=50, usar_diversidade=True, simular_janela=Fal
     if not usar_diversidade:
         for idx, (j, score, rep) in enumerate(candidatos[:qtd_desejada], 1):
             jogos_selecionados.append({
-                "id": idx,
-                "dezenas": j,
-                "dezenas_str": " ".join(f"{d:02d}" for d in j),
-                "score": score,
-                "rep": rep
+                "ID": idx,
+                "Dezenas Sugeridas (15 números)": " ".join(f"{d:02d}" for d in j),
+                "Score V10": f"{score:.6f}",
+                "Repetições Anteriores": rep,
+                "_score_num": score
             })
             frequencias.update(j)
     else:
-        # Algoritmo de Diversidade: Previne concentrar as mesmas dezenas em lotes de até 100 jogos
         limite_frequencia_ideal = (qtd_desejada * 15 / 25) * 1.30
         candidatos_pool = candidatos.copy()
         
@@ -93,228 +70,117 @@ def gerar_apostas_v10(qtd_desejada=50, usar_diversidade=True, simular_janela=Fal
                 j, score, rep = melhor_cand
                 candidatos_pool.remove(melhor_cand)
                 jogos_selecionados.append({
-                    "id": idx,
-                    "dezenas": j,
-                    "dezenas_str": " ".join(f"{d:02d}" for d in j),
-                    "score": score,
-                    "rep": rep
+                    "ID": idx,
+                    "Dezenas Sugeridas (15 números)": " ".join(f"{d:02d}" for d in j),
+                    "Score V10": f"{score:.6f}",
+                    "Repetições Anteriores": rep,
+                    "_score_num": score
                 })
                 frequencias.update(j)
                 
-    return {
-        "jogos": jogos_selecionados,
-        "freqs_dict": frequencias,
-        "dezenas_faltantes": dezenas_faltantes,
-        "ultimo_resultado_base": ultimo_res,
-        "simulado": simular_janela
-    }
+    return jogos_selecionados, dezenas_faltantes
 
-# -----------------------------------------------------------------------------
-# Barra Lateral (Sidebar) - Parâmetros e Filtros de Geração
-# -----------------------------------------------------------------------------
-st.sidebar.markdown("### Parâmetros de Geração")
+# Gerenciamento de Estado da Sessão
+if "jogos" not in st.session_state:
+    st.session_state["jogos"] = []
+if "dezenas_faltantes" not in st.session_state:
+    st.session_state["dezenas_faltantes"] = [4, 8, 12, 14, 15, 17, 19, 20, 21, 24]
 
-qtd_apostas = st.sidebar.number_input(
-    "Quantidade de apostas (1 a 100):",
-    min_value=1,
-    max_value=100,
-    value=50,
-    step=1
-)
+# Barra Lateral (Sidebar)
+with st.sidebar:
+    st.markdown("### Parâmetros de Geração")
+    qtd_apostas = st.number_input("Quantidade de apostas (1 a 100):", min_value=1, max_value=100, value=50)
+    usar_diversidade = st.checkbox("Ativar Controle de Diversidade", value=True, help="Aplica algoritmo de balanceamento de dezenas.")
+    
+    st.divider()
+    st.markdown("### Teste de Cenários")
+    simular_janela = st.checkbox("Simular 'Janela de Ouro'", value=False, help="Simula o cenário da Janela de Ouro com apenas 3 dezenas faltantes.")
+    
+    st.divider()
+    st.markdown("### Último resultado base:")
+    res_str = " ".join(f"{d:02d}" for d in ULTIMO_RESULTADO_DEFAULT)
+    st.code(res_str, language="text")
+    
+    col_btn1, col_btn2 = st.columns(2)
+    with col_btn1:
+        if st.button("🎯 Gerar Apo...", type="primary"):
+            jogos, faltantes = gerar_apostas_v10(qtd_apostas, usar_diversidade, simular_janela)
+            st.session_state["jogos"] = jogos
+            st.session_state["dezenas_faltantes"] = faltantes
+    with col_btn2:
+        if st.button("🗑️ Limpar Ap..."):
+            st.session_state["jogos"] = []
 
-ativar_diversidade = st.sidebar.checkbox(
-    "Ativar Controle de Diversidade",
-    value=True,
-    help="Equilibra a distribuição das 25 dezenas no lote gerado para evitar a repetição viciada dos mesmos números ao apostar em alto volume."
-)
+# Atualização de estado ao alternar a simulação
+if simular_janela:
+    st.session_state["dezenas_faltantes"] = [4, 14, 20]
+    if st.session_state["jogos"]:
+        jogos, faltantes = gerar_apostas_v10(qtd_apostas, usar_diversidade, simular_janela=True)
+        st.session_state["jogos"] = jogos
+else:
+    if not st.session_state["jogos"]:
+        st.session_state["dezenas_faltantes"] = [4, 8, 12, 14, 15, 17, 19, 20, 21, 24]
 
-st.sidebar.divider()
-st.sidebar.markdown("### 🧪 Teste de Cenários")
-modo_simulacao = st.sidebar.checkbox(
-    "Simular 'Janela de Ouro'",
-    value=False,
-    help="Ative para testar como o painel responde quando restam apenas 3 dezenas no ciclo."
-)
-
-# Reação instantânea do simulador ao marcar/desmarcar a caixa de seleção
-if modo_simulacao:
-    st.session_state['dados_gerados'] = gerar_apostas_v10(
-        qtd_desejada=qtd_apostas,
-        usar_diversidade=ativar_diversidade,
-        simular_janela=True
-    )
-elif st.session_state['dados_gerados'] is not None and st.session_state['dados_gerados'].get('simulado') is True:
-    st.session_state['dados_gerados'] = gerar_apostas_v10(
-        qtd_desejada=qtd_apostas,
-        usar_diversidade=ativar_diversidade,
-        simular_janela=False
-    )
-
-st.sidebar.write("")
-st.sidebar.markdown("**Último resultado base:**")
-txt_ultimo_res = "01 02 03 05 06 07 09 10 11 13 16 18 22 23 25"
-st.sidebar.markdown(f"`{txt_ultimo_res}`")
-
-st.sidebar.write("")
-col_btn1, col_btn2 = st.sidebar.columns([1, 1])
-
-with col_btn1:
-    if st.button("🚀 Gerar Apostas V10", use_container_width=True, type="primary"):
-        st.session_state['dados_gerados'] = gerar_apostas_v10(
-            qtd_desejada=qtd_apostas,
-            usar_diversidade=ativar_diversidade,
-            simular_janela=modo_simulacao
-        )
-        st.rerun()
-
-with col_btn2:
-    if st.button("🗑️ Limpar Apostas", use_container_width=True):
-        st.session_state['dados_gerados'] = None
-        st.rerun()
-
-# -----------------------------------------------------------------------------
-# Cabeçalho da Página e Popover do Guia do Sistema
-# -----------------------------------------------------------------------------
-col_title, col_help = st.columns([3, 1])
-
+# Cabeçalho Principal
+col_title, col_guide = st.columns([4, 1])
 with col_title:
     st.title("🎯 Lotofácil Pro - Gerador de Apostas V10")
     st.caption("Gerador otimizado com filtro estatístico V10 e controle de diversidade de dezenas.")
 
-with col_help:
-    st.write("")
-    with st.popover("📘 Guia & Como Funciona", use_container_width=True):
-        st.markdown("### 📘 Guia Completo do Sistema, Etapas e Janela de Ouro")
-        st.markdown("""
-        Entenda o funcionamento dos indicadores estatísticos e saiba quando efetuar suas apostas com máxima precisão.
-
-        ---
-        #### 🔄 As 3 Etapas do Ciclo
-        * **🟢 Etapa 1: Início do Ciclo (10 a 25 dezenas faltantes)**
-          Fase inicial. O ciclo acabou de reiniciar. Alta volatilidade entre dezenas; recomendado manter volume moderado de apostas.
-        * **🟡 Etapa 2: Maturação do Ciclo (5 a 9 dezenas faltantes)**
-          Fase intermediária. As dezenas frequentes começam a afunilar e consolidar tendência.
-        * **🔴 Etapa 3: Fechamento do Ciclo (1 a 4 dezenas faltantes)**
-          Reta final do ciclo. Probabilidade altíssima de sorteio das dezenas faltantes para o encerramento completo do ciclo.
-
-        ---
-        #### ⭐ A JANELA DE OURO (MELHOR OPORTUNIDADE / APOSTA MÁXIMA!)
-        * **🎯 Requisitos Obrigatoriamente Combinados:**
-          1. Ciclo na **Etapa 3** (Faltando 4 ou menos dezenas no ciclo).
-          2. **Score V10 Médio dos Jogos Selecionados ≥ 1.1800**.
-        * **🔥 Por que Apostar no Momento da Janela de Ouro?**
-          É o ponto exato de máxima convergência matemática entre a necessidade de fechamento do ciclo e o filtro V10 de alta assertividade.
-
-        ---
-        #### 💡 Significado dos Emojis e Indicadores
-        * **🏆 Janela de Ouro Ativa:** Notificação de momento ideal para aposta com investimento máximo.
-        * **✅ Oportunidade Estatística Ativa:** Operação normal em que o sistema atinge os parâmetros recomendados.
-        * **⚙️ Controle de Diversidade:** Algoritmo que previne o vício em poucas dezenas, distribuindo os números de forma equilibrada em volumes até 100 jogos.
-        * **📊 Score V10:** Métrica do filtro estatístico que combina padrões de números primos, moldura, par/ímpar e repetidas.
-        * **🔄 Repetições Anteriores:** Quantidade de números no jogo que coincidem com o concurso base anterior.
-        """)
+with col_guide:
+    with st.expander("📘 Guia & Como Funciona"):
+        st.write("Instruções detalhadas sobre os filtros estatísticos V10 e estratégias de fechamento de ciclo.")
 
 st.divider()
 
-# -----------------------------------------------------------------------------
-# Exibição dos Jogos ou Estado Vazio
-# -----------------------------------------------------------------------------
-dados = st.session_state['dados_gerados']
-
-if dados is None:
-    st.info("💡 **Nenhuma aposta gerada no momento.** Ajuste os parâmetros na barra lateral e clique em **🚀 Gerar Apostas V10** para criar seu lote de apostas.")
+# Indicadores (Métricas)
+jogos = st.session_state["jogos"]
+total_jogos = len(jogos)
+if total_jogos > 0:
+    score_medio = sum(j["_score_num"] for j in jogos) / total_jogos
+    rep_media = sum(j["Repetições Anteriores"] for j in jogos) / total_jogos
 else:
-    jogos = dados["jogos"]
-    freqs_dict = dados["freqs_dict"]
-    dezenas_faltantes = dados["dezenas_faltantes"]
+    score_medio = 0.0
+    rep_media = 0.0
 
-    # Dashboard de Métricas
-    score_medio = sum(j["score"] for j in jogos) / len(jogos) if jogos else 0.0
-    rep_media = sum(j["rep"] for j in jogos) / len(jogos) if jogos else 0.0
+col_m1, col_m2, col_m3 = st.columns(3)
+col_m1.metric("Total de Apostas Geradas", f"{total_jogos}")
+col_m2.metric("Score V10 Médio", f"{score_medio:.4f}")
+col_m3.metric("Repetição Média", f"{rep_media:.1f} dezenas")
 
-    m1, m2, m3 = st.columns(3)
-    m1.metric("Total de Apostas Geradas", f"{len(jogos)}")
-    m2.metric("Score V10 Médio", f"{score_medio:.4f}")
-    m3.metric("Repetição Média", f"{rep_media:.1f} dezenas")
+st.divider()
 
-    # Banner Inteligente da Janela de Ouro
-    qtd_faltantes = len(dezenas_faltantes)
-    janela_ouro = (qtd_faltantes <= 4 and score_medio >= 1.18)
+# Painel Informativo da Oportunidade Estatística
+faltantes_fmt = ", ".join(f"{d:02d}" for d in st.session_state["dezenas_faltantes"])
+qtd_faltantes = len(st.session_state["dezenas_faltantes"])
 
-    if janela_ouro:
-        st.success(
-            f"### 🏆 JANELA DE OURO ATIVA — MELHOR CHANCE (APOSTA MÁXIMA)\n\n"
-            f"📌 **Faltam {qtd_faltantes} dezenas para fechamento:** {', '.join(f'{d:02d}' for d in dezenas_faltantes)}\n\n"
-            f"ℹ️ **Condição para a MELHOR CHANCE (⭐ Janela de Ouro):** Exige Faltantes ≤ 4 e Score V10 ≥ 1.1800 *(Score Atual: {score_medio:.4f})*."
-        )
-    else:
-        st.info(
-            f"### ✅ OPORTUNIDADE ESTATÍSTICA ATIVA\n\n"
-            f"📌 **Faltam {qtd_faltantes} dezenas para fechamento:** {', '.join(f'{d:02d}' for d in dezenas_faltantes)}\n\n"
-            f"ℹ️ **Condição para a MELHOR CHANCE (⭐ Janela de Ouro):** Exige Faltantes ≤ 4 e Score V10 ≥ 1.1800 *(Score Atual: {score_medio:.4f})*."
-        )
+st.info(f"""
+### ✅ OPORTUNIDADE ESTATÍSTICA ATIVA
 
-    st.write("")
+📌 **Faltam {qtd_faltantes} dezenas para fechamento:** {faltantes_fmt}
 
-    # Tabela de Jogos Gerados
-    st.markdown("### 📜 Jogos Gerados")
+ℹ️ **Condição para a MELHOR CHANCE (⭐ Janela de Ouro):** Exige Faltantes ≤ 4 e Score V10 ≥ 1.1800 *(Score Atual: {score_medio:.4f})*.
+""")
 
-    df_jogos = pd.DataFrame([
-        {
-            "ID": j["id"],
-            "Dezenas Sugeridas (15 números)": j["dezenas_str"],
-            "Score V10": f"{j['score']:.6f}",
-            "Repetições Anteriores": j["rep"]
-        } for j in jogos
-    ])
+# Tabela de Jogos Gerados e Ações
+st.markdown("### 📜 Jogos Gerados")
 
-    st.dataframe(
-        df_jogos,
-        column_config={
-            "ID": st.column_config.NumberColumn("ID", format="%d"),
-            "Dezenas Sugeridas (15 números)": st.column_config.TextColumn("Dezenas Sugeridas (15 números)", width="large"),
-            "Score V10": st.column_config.TextColumn("Score V10"),
-            "Repetições Anteriores": st.column_config.NumberColumn("Repetições Anteriores", format="%d")
-        },
-        use_container_width=True,
-        hide_index=True
-    )
-
-    # Ações para Download e Limpeza
-    col_dl1, col_dl2 = st.columns([3, 1])
-    with col_dl1:
+if jogos:
+    df_jogos = pd.DataFrame(jogos).drop(columns=["_score_num"])
+    st.dataframe(df_jogos, use_container_width=True, hide_index=True)
+    
+    col_csv, col_clear = st.columns([1, 1])
+    with col_csv:
         csv_data = df_jogos.to_csv(index=False).encode('utf-8')
         st.download_button(
-            label="📩 Baixar Arquivo CSV das Apostas",
+            label="📥 Baixar Arquivo CSV das Apostas",
             data=csv_data,
-            file_name=f"apostas_lotofacil_v10_{len(jogos)}_jogos.csv",
-            mime="text/csv",
-            use_container_width=True
+            file_name="apostas_lotofacil_v10.csv",
+            mime="text/csv"
         )
-    with col_dl2:
-        if st.button("🗑️ Limpar Jogos da Tela", use_container_width=True):
-            st.session_state['dados_gerados'] = None
+    with col_clear:
+        if st.button("🗑️ Limpar Jogos da Tela"):
+            st.session_state["jogos"] = []
             st.rerun()
-
-    st.divider()
-
-    # Tabela de Distribuição de Dezenas (1 a 25)
-    st.markdown("### 📊 Distribuição das Dezenas Geradas (1 a 25)")
-
-    dados_distribuicao = []
-    tot_jogos = len(jogos)
-
-    for d in range(1, 26):
-        freq = freqs_dict[d]
-        porcentagem = (freq / tot_jogos * 100.0) if tot_jogos > 0 else 0.0
-        dados_distribuicao.append({
-            "Dezena": f"{d:02d}",
-            "Frequência": freq,
-            "Porcentagem (%)": f"{porcentagem:.1f}%"
-        })
-
-    df_distrib = pd.DataFrame(dados_distribuicao).T
-    df_distrib.columns = [f"{i:02d}" for i in range(1, 26)]
-    df_distrib = df_distrib.iloc[1:]
-
-    st.dataframe(df_distrib, use_container_width=True)
+else:
+    st.dataframe(pd.DataFrame(columns=["ID", "Dezenas Sugeridas (15 números)", "Score V10", "Repetições Anteriores"]), use_container_width=True)
