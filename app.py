@@ -30,14 +30,15 @@ PRIMOS = {2, 3, 5, 7, 11, 13, 17, 19, 23}
 # Motor Preditivo V10 & Algoritmo de Controle de Diversidade
 # -----------------------------------------------------------------------------
 def gerar_apostas_v10(qtd_desejada=50, usar_diversidade=True, simular_janela=False):
+    # Concurso base fixo (15 dezenas) para permitir a validação de repetição V10
+    ultimo_res = [1, 2, 3, 5, 6, 7, 9, 10, 11, 13, 16, 18, 22, 23, 25]
+
     if simular_janela:
         # Cenário de Simulação: Apenas 3 dezenas faltantes (Gatilho da Janela de Ouro)
         dezenas_faltantes = [4, 14, 20]
-        ultimo_res = [1, 2, 3, 5, 6, 7, 8, 9, 10, 11, 12, 13, 15, 16, 17, 18, 19, 21, 22, 23, 24, 25]
     else:
         # Cenário Real Padrão
         dezenas_faltantes = [4, 8, 12, 14, 15, 17, 19, 20, 21, 24]
-        ultimo_res = [1, 2, 3, 5, 6, 7, 9, 10, 11, 13, 16, 18, 22, 23, 25]
     
     # Pool estocástico de candidatos filtrados pelo V10
     candidatos = []
