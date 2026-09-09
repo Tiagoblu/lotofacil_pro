@@ -27,8 +27,9 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 # ── CARREGAMENTO DE DADOS & MOTOR OFICIAL ─────────────────────────────
-@st.cache_data(ttl=300)
-def executar_motor_oficial():
+# ttl=60 e parâmetro quantidade_jogos garantem a atualização do cache
+@st.cache_data(ttl=60)
+def executar_motor_oficial(quantidade_jogos: int = 30):
     try:
         from core.infrastructure.downloader.baixar import baixar_dados_novos
         baixar_dados_novos()
@@ -49,7 +50,9 @@ def executar_motor_oficial():
     alvo = ultimo.numero + 1
 
     engine = ProbabilisticEngine()
-    jogos, info = engine.gerar_jogos(concursos)
+    
+    # Chamada explícita usando o nome exato do parâmetro do seu engine: quantidade
+    jogos, info = engine.gerar_jogos(concursos, quantidade=quantidade_jogos)
 
     jogos_processados = []
     faltantes = info.get("dezenas_faltantes", [])
@@ -79,7 +82,7 @@ def executar_motor_oficial():
     }, None
 
 # ── EXECUÇÃO E INTERFACE STREAMLIT ────────────────────────────────────
-dados, erro = executar_motor_oficial()
+dados, erro = executar_motor_oficial(quantidade_jogos=30)
 
 # Cabeçalho Principal e Botão de Ajuda
 col_title, col_help = st.columns([3, 1])
@@ -125,12 +128,12 @@ else:
             "🎲 Quantidade de Jogos Desejada:", 
             min_value=5, 
             max_value=30, 
-            value=5, 
+            value=30, 
             step=5
         )
     with c_ctrl2:
         st.write("")
-        modo_pro = st.toggle("⚙️ Modo Avançado / Pro", value=False)
+        modo_pro = st.toggle("⚙️ Modo Avançado / Pro", value=True)
 
     jogos_filtrados = todos_jogos[:qtd_gerar]
 
@@ -161,7 +164,7 @@ else:
         status_titulo = "✅ OPORTUNIDADE ESTATÍSTICA ATIVA"
         alerta_func = st.info
 
-    # Texto explicativo com o emoji de estrela inserido no texto (⭐ Janela de Ouro)
+    # Texto explicativo
     if janela_ouro_ativa:
         txt_janela_ouro = "⭐ **MELHOR CHANCE CONFIRMADA (⭐ Janela de Ouro):** Ciclo na reta final (≤ 4 dezenas) e Score Médio ≥ 1.1800. Ponto ideal para aposta!"
     else:
@@ -173,7 +176,7 @@ else:
         
         alerta_func(f"**SITUAÇÃO DO CICLO:** {status_titulo} — {txt_dezenas}.\n\n{txt_janela_ouro}")
         
-        st.markdown(f"### 📋 Sugestões de {qtd_gerar} Jogos para Hoje")
+        st.markdown(f"### 📋 Sugestões de {len(jogos_filtrados)} Jogos para Hoje")
         st.caption("Escolha seus palpites e clique no código para copiar:")
         
         for jogo in jogos_filtrados:
@@ -195,7 +198,7 @@ else:
 
         alerta_func(f"### {status_titulo}\n\n📌 **{txt_dezenas}**\n\n{txt_janela_ouro}")
         
-        st.markdown(f"### 📊 Tabela Preditiva Detalhada ({qtd_gerar} Jogos)")
+        st.markdown(f"### 📊 Tabela Preditiva Detalhada ({len(jogos_filtrados)} Jogos)")
         
         df_tabela = pd.DataFrame([
             {
